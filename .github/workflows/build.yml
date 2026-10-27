@@ -62,12 +62,12 @@ jobs:
           mkdir dist
           for f in app/build/outputs/apk/release/app-*-release.apk; do
             abi=$(basename "$f" | sed -e 's/^app-//' -e 's/-release\.apk$//')
-            cp "$f" "dist/Manga-$abi.apk"
+            cp "$f" "dist/Mashiro-$abi.apk"
           done
           version=$(grep -m1 'versionName = ' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
           tag="v$version-r${{ github.run_number }}"
           gh release create "$tag" dist/*.apk \
             --target "${{ github.sha }}" \
-            --title "Manga $version (build ${{ github.run_number }})" \
-            --notes "Descarga **Manga-arm64-v8a.apk** (casi todos los móviles). Si no se instala, usa **Manga-universal.apk**." \
+            --title "ましろ $version (build ${{ github.run_number }})" \
+            --notes "Descarga **Mashiro-arm64-v8a.apk** (casi todos los móviles). Si no se instala, usa **Mashiro-universal.apk**." \
             --latest
