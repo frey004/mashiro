@@ -1,3 +1,8 @@
+> **Manga** es un fork de [Mihon](https://github.com/mihonapp/mihon) (licencia Apache 2.0).
+> Se instala junto a Mihon (ID `com.frey004.manga`), sin telemetría ni actualizador automático.
+> El APK se compila con GitHub Actions: pestaña **Actions → Build APK → Artifacts**.
+> Todo el mérito del código original es del equipo de Mihon; el resto de este README es el original.
+
 <div align="center">
 
 <a href="https://mihon.app">
