@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -54,8 +54,20 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/signing.jks"
 
-      - name: Upload APKs
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: manga-apk-${{ github.sha }}
-          path: app/build/outputs/apk/release/*.apk
+      # Publica los APK en una Release para descargarlos directamente (sin ZIP)
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir dist
+          for f in app/build/outputs/apk/release/app-*-release.apk; do
+            abi=$(basename "$f" | sed -e 's/^app-//' -e 's/-release\.apk$//')
+            cp "$f" "dist/Manga-$abi.apk"
+          done
+          version=$(grep -m1 'versionName = ' app/build.gradle.kts | sed 's/.*"\(.*\)".*/\1/')
+          tag="v$version-r${{ github.run_number }}"
+          gh release create "$tag" dist/*.apk \
+            --target "${{ github.sha }}" \
+            --title "Manga $version (build ${{ github.run_number }})" \
+            --notes "Descarga **Manga-arm64-v8a.apk** (casi todos los móviles). Si no se instala, usa **Manga-universal.apk**." \
+            --latest
