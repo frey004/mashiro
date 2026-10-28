@@ -24,6 +24,7 @@ import tachiyomi.domain.manga.interactor.GetLibraryManga
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.track.interactor.GetTracks
 import tachiyomi.domain.track.interactor.UpsertTrack
+import java.text.Normalizer
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
@@ -124,7 +125,11 @@ class AddTracks(
         var bound = 0
         pendingAutomaticTrackers(manga).forEach { tracker ->
             try {
-                val match = bestMatch(manga.title, tracker.search(manga.title)) ?: return@forEach
+                val match = findMatch(tracker, manga.title)
+                if (match == null) {
+                    logcat(LogPriority.INFO) { "Auto track: no results for '${manga.title}' in $tracker" }
+                    return@forEach
+                }
                 match.manga_id = manga.id
                 bind(tracker, match, manga.id)
                 bound++
@@ -157,6 +162,30 @@ class AddTracks(
             .filter { it !is EnhancedTracker && it.id !in trackedIds }
     }
 
+    /**
+     * Los títulos de las fuentes suelen estar traducidos (p. ej. al español) y los servicios usan
+     * el título original o en inglés, así que se prueban varias versiones del título.
+     */
+    private suspend fun findMatch(tracker: Tracker, title: String): TrackSearch? {
+        for (query in searchQueries(title)) {
+            val results = tracker.search(query)
+            if (results.isNotEmpty()) return bestMatch(query, results)
+        }
+        return null
+    }
+
+    private fun searchQueries(title: String): List<String> {
+        val withoutAccents = Normalizer.normalize(title, Normalizer.Form.NFD)
+            .replace(DIACRITICS, "")
+        val withoutArticle = withoutAccents.replace(LEADING_ARTICLE, "")
+        val beforeSeparator = withoutAccents.split(':', '–', '—', '(', '[').first()
+        val simplified = withoutArticle.replace(PUNCTUATION, " ").replace(SPACES, " ")
+        return listOf(title, withoutAccents, withoutArticle, beforeSeparator, simplified)
+            .map { it.trim() }
+            .filter { it.length >= 2 }
+            .distinct()
+    }
+
     private fun bestMatch(title: String, results: List<TrackSearch>): TrackSearch? {
         val wanted = title.normalizedTitle()
         return results.firstOrNull { it.title.normalizedTitle() == wanted }
@@ -168,4 +197,11 @@ class AddTracks(
     }
 
     private fun String.normalizedTitle() = lowercase().filter { it.isLetterOrDigit() }
+
+    private companion object {
+        val DIACRITICS = "\\p{Mn}+".toRegex()
+        val LEADING_ARTICLE = "^(el|la|los|las|un|una|lo|the|a|an)\\s+".toRegex(RegexOption.IGNORE_CASE)
+        val PUNCTUATION = "[^\\p{L}\\p{N}\\s]".toRegex()
+        val SPACES = "\\s+".toRegex()
+    }
 }
