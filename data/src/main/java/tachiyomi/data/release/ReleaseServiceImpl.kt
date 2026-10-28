@@ -12,6 +12,7 @@ import eu.kanade.tachiyomi.network.parseAs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import okhttp3.CacheControl
 import tachiyomi.domain.release.interactor.GetApplicationRelease
 import tachiyomi.domain.release.model.Release
 import tachiyomi.domain.release.service.ReleaseService
@@ -28,7 +29,14 @@ class ReleaseServiceImpl(
         val release = withContext(Dispatchers.IO) {
             with(json) {
                 networkService.client
-                    .newCall(GET("https://api.github.com/repos/${arguments.repository}/releases/latest"))
+                    // Sin caché: una respuesta antigua (p. ej. un 404 de cuando el repositorio era privado)
+                    // no debe impedir ver la versión nueva
+                    .newCall(
+                        GET(
+                            "https://api.github.com/repos/${arguments.repository}/releases/latest",
+                            cache = CacheControl.FORCE_NETWORK,
+                        ),
+                    )
                     .awaitSuccess()
                     .parseAs<GithubRelease>()
             }
