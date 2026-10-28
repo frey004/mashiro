@@ -2,6 +2,22 @@ package eu.kanade.presentation.more.settings.screen
 
 import android.app.Activity
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import eu.kanade.domain.ui.model.AppTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
@@ -104,10 +120,25 @@ object SettingsAppearanceScreen : SearchableSettings {
         uiPreferences: UiPreferences,
     ): Preference.PreferenceGroup {
         val enabled by uiPreferences.liquidGlass.collectAsState()
+        val glassColor by uiPreferences.liquidGlassColor.collectAsState()
+        val context = LocalContext.current
 
         return Preference.PreferenceGroup(
             title = stringResource(MR.strings.pref_category_liquid_glass),
             preferenceItems = listOf(
+                Preference.PreferenceItem.CustomPreference(
+                    title = stringResource(MR.strings.pref_liquid_glass_color),
+                ) {
+                    GlassColorPicker(
+                        selected = glassColor,
+                        onSelect = { color ->
+                            uiPreferences.liquidGlassColor.set(color)
+                            // El color también genera la paleta del tema liquid glass
+                            uiPreferences.appTheme.set(AppTheme.LIQUID_GLASS)
+                            (context as? Activity)?.let { ActivityCompat.recreate(it) }
+                        },
+                    )
+                },
                 Preference.PreferenceItem.SwitchPreference(
                     preference = uiPreferences.liquidGlass,
                     title = stringResource(MR.strings.pref_liquid_glass),
@@ -212,3 +243,43 @@ private val DateFormats = listOf(
     "dd MMM yyyy",
     "MMM dd, yyyy",
 )
+
+private val GlassColors = listOf(
+    0xFF5B8DEF, // Azul
+    0xFF8E6CEF, // Violeta
+    0xFFE86AA6, // Rosa
+    0xFFE5534B, // Rojo
+    0xFFF08C3A, // Naranja
+    0xFFE8C547, // Amarillo
+    0xFF4CB782, // Verde
+    0xFF2FB5B5, // Turquesa
+    0xFF8A94A6, // Gris
+    0xFFC9D6E3, // Hielo
+).map { it.toInt() }
+
+@Composable
+private fun GlassColorPicker(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(GlassColors) { color ->
+            val isSelected = color == selected
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(Color(color))
+                    .border(
+                        width = if (isSelected) 3.dp else 1.dp,
+                        color = if (isSelected) MaterialTheme.colorScheme.onSurface else Color.White.copy(alpha = 0.4f),
+                        shape = CircleShape,
+                    )
+                    .clickable { onSelect(color) },
+            )
+        }
+    }
+}

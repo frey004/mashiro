@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -47,9 +48,13 @@ data class GlassStyle(
     val enabled: Boolean = true,
     val blurRadius: Dp = 24.dp,
     val opacity: Float = 0.45f,
+    val tint: Color? = null,
 )
 
 val LocalGlassStyle = staticCompositionLocalOf { GlassStyle() }
+
+/** Cuánto del color elegido se mezcla con la superficie del cristal. */
+private const val GLASS_TINT_AMOUNT = 0.3f
 
 /**
  * Espacio extra que las pantallas deben dejar abajo porque hay una barra flotante encima.
@@ -101,7 +106,8 @@ fun GlassSurface(
     val canBlur = style.enabled && backdrop != null && style.blurRadius > 0.dp &&
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     val tint = if (style.enabled) {
-        colorScheme.surface.copy(alpha = style.opacity)
+        val base = style.tint?.let { lerp(colorScheme.surface, it, GLASS_TINT_AMOUNT) } ?: colorScheme.surface
+        base.copy(alpha = style.opacity)
     } else {
         colorScheme.surfaceColorAtElevation(3.dp)
     }

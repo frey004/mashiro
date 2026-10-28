@@ -913,4 +913,6 @@
     <string name="browse_search_manga">Buscar manga</string>
     <string name="ext_hide_sources">Ocultar fuentes</string>
     <string name="ext_show_sources">Mostrar fuentes</string>
+    <string name="theme_liquid_glass">Liquid glass</string>
+    <string name="pref_liquid_glass_color">Color del cristal</string>
 </resources>

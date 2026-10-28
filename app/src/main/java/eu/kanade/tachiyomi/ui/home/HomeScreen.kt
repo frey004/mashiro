@@ -127,10 +127,12 @@ object HomeScreen : Screen() {
         val glassEnabled by uiPreferences.liquidGlass.collectAsState()
         val glassBlur by uiPreferences.liquidGlassBlur.collectAsState()
         val glassTransparency by uiPreferences.liquidGlassTransparency.collectAsState()
+        val glassColor by uiPreferences.liquidGlassColor.collectAsState()
         val glassStyle = GlassStyle(
             enabled = glassEnabled,
             blurRadius = glassBlur.dp,
             opacity = 1f - glassTransparency / 100f,
+            tint = Color(glassColor),
         )
 
         TabNavigator(

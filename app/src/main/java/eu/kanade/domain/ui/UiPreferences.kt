@@ -28,14 +28,8 @@ class UiPreferences(
 
     val themeMode: Preference<ThemeMode> = preferenceStore.getEnum("pref_theme_mode_key", ThemeMode.SYSTEM)
 
-    val appTheme: Preference<AppTheme> = preferenceStore.getEnum(
-        "pref_app_theme",
-        if (DeviceUtil.isDynamicColorAvailable) {
-            AppTheme.MONET
-        } else {
-            AppTheme.DEFAULT
-        },
-    )
+    // ましろ usa por defecto el tema liquid glass, con colores generados a partir de liquidGlassColor
+    val appTheme: Preference<AppTheme> = preferenceStore.getEnum("pref_app_theme", AppTheme.LIQUID_GLASS)
 
     val themeDarkAmoled: Preference<Boolean> = preferenceStore.getBoolean("pref_theme_dark_amoled_key", false)
 
@@ -51,6 +45,9 @@ class UiPreferences(
 
     val liquidGlass: Preference<Boolean> = preferenceStore.getBoolean("pref_liquid_glass", true)
 
+    /** Color base del tema y del cristal (ARGB). */
+    val liquidGlassColor: Preference<Int> = preferenceStore.getInt("pref_liquid_glass_color", DEFAULT_GLASS_COLOR)
+
     /** Desenfoque del cristal en dp. */
     val liquidGlassBlur: Preference<Int> = preferenceStore.getInt("pref_liquid_glass_blur", 24)
 
@@ -58,6 +55,8 @@ class UiPreferences(
     val liquidGlassTransparency: Preference<Int> = preferenceStore.getInt("pref_liquid_glass_transparency", 55)
 
     companion object {
+        const val DEFAULT_GLASS_COLOR = 0xFF5B8DEF.toInt()
+
         fun dateFormat(format: String, locale: Locale): DateTimeFormatter = when (format) {
             "" -> DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale)
             else -> DateTimeFormatter.ofPattern(format, locale)
