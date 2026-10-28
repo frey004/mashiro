@@ -87,11 +87,9 @@ fun ReaderAppBars(
             enter = slideInVertically(readerBarsSlideAnimationSpec) { -it } + fadeIn(readerBarsFadeAnimationSpec),
             exit = slideOutVertically(readerBarsSlideAnimationSpec) { -it } + fadeOut(readerBarsFadeAnimationSpec),
         ) {
-            // Barra superior flotante con estilo de tinta
+            // Barra superior de raíces, de borde a borde
             InkSurface(
-                modifier = Modifier
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 seed = 1,
             ) {
             ReaderTopBar(
@@ -169,17 +167,17 @@ fun ReaderAppBars(
                         onPageIndexChangeFinished = onPageIndexChangeFinished,
                     )
                 }
-                // Barra inferior flotante con estilo de tinta
+                // Barra inferior de raíces, de borde a borde
                 InkSurface(
-                    modifier = Modifier
-                        .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     seed = 2,
                 ) {
                 ReaderBottomBar(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = MaterialTheme.padding.small),
+                        .padding(horizontal = MaterialTheme.padding.small)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(vertical = 6.dp),
                     readingMode = readingMode,
                     onClickReadingMode = onClickReadingMode,
                     orientation = orientation,
