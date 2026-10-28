@@ -1,6 +1,7 @@
 package mihon.app.di
 
 import android.content.Context
+import tachiyomi.domain.manga.interactor.NetworkToLocalManga
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.DependencyGraph
 import dev.zacsweers.metro.Provides
@@ -122,6 +123,7 @@ interface AppGraph : ViewModelGraph {
     val resetCategoryFlags: ResetCategoryFlags
     val addTracks: AddTracks
     val upsertTrack: UpsertTrack
+    val networkToLocalManga: NetworkToLocalManga
 
     val getExtensionStoreCountAsFlow: GetExtensionStoreCountAsFlow
 

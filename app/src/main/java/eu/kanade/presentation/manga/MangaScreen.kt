@@ -58,6 +58,9 @@ import eu.kanade.presentation.manga.components.MangaHeroHeader
 import eu.kanade.presentation.manga.components.MangaPrimaryActions
 import eu.kanade.presentation.manga.components.MangaProgressCard
 import eu.kanade.presentation.manga.components.MangaRecommendations
+import eu.kanade.tachiyomi.ui.manga.MangaScreen as MangaDetailsScreen
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import eu.kanade.presentation.manga.components.MangaToolbar
 import eu.kanade.presentation.manga.components.MissingChapterCountListItem
 import eu.kanade.presentation.util.formatChapterNumber
@@ -433,9 +436,10 @@ private fun MangaScreenSmallImpl(
                         key = MangaScreenItem.RECOMMENDATIONS,
                         contentType = MangaScreenItem.RECOMMENDATIONS,
                     ) {
+                        val navigator = LocalNavigator.currentOrThrow
                         MangaRecommendations(
-                            title = state.manga.title,
-                            onRecommendationClick = { onSearch(it, true) },
+                            manga = state.manga,
+                            onClickManga = { navigator.push(MangaDetailsScreen(it.id, true)) },
                         )
                     }
 

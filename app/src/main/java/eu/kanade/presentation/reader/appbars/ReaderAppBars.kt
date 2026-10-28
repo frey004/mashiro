@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.statusBars
+import eu.kanade.presentation.reader.components.InkSurface
 import eu.kanade.presentation.reader.components.ChapterNavigator
 import eu.kanade.presentation.reader.components.ChapterNavigatorType
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
@@ -85,9 +87,15 @@ fun ReaderAppBars(
             enter = slideInVertically(readerBarsSlideAnimationSpec) { -it } + fadeIn(readerBarsFadeAnimationSpec),
             exit = slideOutVertically(readerBarsSlideAnimationSpec) { -it } + fadeOut(readerBarsFadeAnimationSpec),
         ) {
+            // Barra superior flotante con estilo de tinta
+            InkSurface(
+                modifier = Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                rootsFromTop = false,
+            ) {
             ReaderTopBar(
                 modifier = Modifier
-                    .background(backgroundColor)
                     .clickable(onClick = onClickTopAppBar),
                 mangaTitle = mangaTitle,
                 chapterTitle = chapterTitle,
@@ -98,6 +106,7 @@ fun ReaderAppBars(
                 onOpenInBrowser = onOpenInBrowser,
                 onShare = onShare,
             )
+            }
         }
 
         if (!chapterNavigatorType.isHorizontal()) {
@@ -160,12 +169,17 @@ fun ReaderAppBars(
                         onPageIndexChangeFinished = onPageIndexChangeFinished,
                     )
                 }
+                // Barra inferior flotante con estilo de tinta
+                InkSurface(
+                    modifier = Modifier
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                    rootsFromTop = true,
+                ) {
                 ReaderBottomBar(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(backgroundColor)
-                        .padding(horizontal = MaterialTheme.padding.small)
-                        .windowInsetsPadding(WindowInsets.navigationBars),
+                        .padding(horizontal = MaterialTheme.padding.small),
                     readingMode = readingMode,
                     onClickReadingMode = onClickReadingMode,
                     orientation = orientation,
@@ -174,6 +188,7 @@ fun ReaderAppBars(
                     onClickCropBorder = onClickCropBorder,
                     onClickSettings = onClickSettings,
                 )
+                }
             }
         }
     }

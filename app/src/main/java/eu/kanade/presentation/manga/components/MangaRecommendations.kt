@@ -1,5 +1,9 @@
 package eu.kanade.presentation.manga.components
 
+import android.content.Context
+import eu.kanade.tachiyomi.source.CatalogueSource
+import mihon.domain.manga.model.toDomainManga
+import tachiyomi.domain.manga.model.Manga
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -55,28 +59,89 @@ data class MangaRecommendation(
 )
 
 /**
- * Recomendaciones de mangas parecidos (datos públicos de AniList, sin iniciar sesión).
- * Al tocar una se busca ese título en todas las extensiones instaladas.
+ * Recomendaciones dentro de la ficha: mangas parecidos (según AniList) buscados en la misma
+ * extensión del manga, para abrirlos directamente. Si no hay, se muestran los populares de la extensión.
  */
 @Composable
 fun MangaRecommendations(
-    title: String,
-    onRecommendationClick: (title: String) -> Unit,
+    manga: Manga,
+    onClickManga: (Manga) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val client = remember { context.appGraph.networkHelper.client }
-    val recommendations by produceState(initialValue = emptyList<MangaRecommendation>(), title) {
-        value = AnilistDiscovery.recommendations(client, title)
+    val result by produceState<Pair<String, List<Manga>>?>(initialValue = null, manga.id) {
+        value = ExtensionRecommendations.get(context, manga)
     }
-    if (recommendations.isEmpty()) return
+    val (sourceName, mangas) = result ?: return
+    if (mangas.isEmpty()) return
 
-    CoverCarousel(
-        title = stringResource(MR.strings.manga_recommendations),
-        items = recommendations,
-        onClick = onRecommendationClick,
-        modifier = modifier,
-    )
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(MR.strings.manga_recommendations_in, sourceName),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(mangas, key = { it.id }) { item ->
+                Column(modifier = Modifier.width(110.dp)) {
+                    MangaCover.Book(
+                        data = item,
+                        contentDescription = item.title,
+                        onClick = { onClickManga(item) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private object ExtensionRecommendations {
+    private const val MAX_TITLES = 8
+    private const val MAX_POPULAR = 15
+    private val cache = ConcurrentHashMap<Long, Pair<String, List<Manga>>>()
+
+    suspend fun get(context: Context, manga: Manga): Pair<String, List<Manga>>? {
+        cache[manga.id]?.let { return it }
+        return withContext(Dispatchers.IO) {
+            try {
+                val graph = context.appGraph
+                val source = graph.sourceManager.get(manga.source) as? CatalogueSource
+                    ?: return@withContext null
+                val titles = AnilistDiscovery.recommendations(graph.networkHelper.client, manga.title)
+                    .take(MAX_TITLES)
+                    .map { it.title }
+                // Busca cada título recomendado en la extensión y se queda con el primer resultado
+                val found = titles.mapNotNull { title ->
+                    try {
+                        source.getSearchManga(1, title, source.getFilterList()).mangas.firstOrNull()
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+                val candidates = found.ifEmpty { source.getPopularManga(1).mangas.take(MAX_POPULAR) }
+                val mangas = candidates
+                    .map { it.toDomainManga(source.id) }
+                    .filter { it.url != manga.url }
+                    .distinctBy { it.url }
+                    .let { graph.networkToLocalManga(it) }
+                (source.name to mangas).also { cache[manga.id] = it }
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e) { "Could not load extension recommendations for ${manga.title}" }
+                null
+            }
+        }
+    }
 }
 
 /** Fila horizontal de portadas con título. */
