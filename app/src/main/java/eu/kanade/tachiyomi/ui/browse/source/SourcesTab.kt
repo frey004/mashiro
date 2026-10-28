@@ -16,6 +16,7 @@ import eu.kanade.tachiyomi.ui.browse.BrowseTab
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceScreen
 import eu.kanade.tachiyomi.ui.browse.source.browse.BrowseSourceViewModel
 import eu.kanade.tachiyomi.ui.download.DownloadQueueScreen
+import eu.kanade.tachiyomi.ui.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchScreen
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -31,6 +32,7 @@ fun Screen.sourcesTab(): TabContent {
     val navigator = LocalNavigator.currentOrThrow
     val viewModel = metroViewModel<SourcesViewModel>()
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val suggestions by viewModel.suggestions.collectAsStateWithLifecycle()
 
     return TabContent(
         titleRes = MR.strings.label_sources,
@@ -59,7 +61,8 @@ fun Screen.sourcesTab(): TabContent {
                 onClickGlobalSearch = { navigator.push(GlobalSearchScreen()) },
                 onClickDownloads = { navigator.push(DownloadQueueScreen) },
                 onClickManageExtensions = { BrowseTab.showExtension() },
-                onClickSuggestion = { navigator.push(GlobalSearchScreen(it)) },
+                suggestions = suggestions,
+                onClickSuggestion = { navigator.push(MangaScreen(it.id, true)) },
             )
 
             state.dialog?.let { dialog ->

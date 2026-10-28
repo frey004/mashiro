@@ -13,6 +13,15 @@ import eu.kanade.domain.source.interactor.ToggleSource
 import eu.kanade.domain.source.interactor.ToggleSourcePin
 import eu.kanade.presentation.browse.SourceUiModel
 import kotlinx.coroutines.Dispatchers
+import eu.kanade.tachiyomi.source.CatalogueSource
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import mihon.domain.manga.model.toDomainManga
+import tachiyomi.domain.manga.interactor.NetworkToLocalManga
+import tachiyomi.domain.manga.model.Manga
+import tachiyomi.domain.source.service.SourceManager
+import tachiyomi.source.local.LocalSource
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +48,8 @@ class SourcesViewModel(
     private val getEnabledSources: GetEnabledSources,
     private val toggleSource: ToggleSource,
     private val toggleSourcePin: ToggleSourcePin,
+    private val sourceManager: SourceManager,
+    private val networkToLocalManga: NetworkToLocalManga,
 ) : ViewModel() {
 
     private val _events = Channel<Event>(Int.MAX_VALUE)
@@ -61,6 +72,35 @@ class SourcesViewModel(
     }
         .flowOn(Dispatchers.IO)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5.seconds), State())
+
+    /** Sugerencias: los mangas populares de algunas extensiones instaladas. */
+    private val _suggestions = MutableStateFlow<List<SourceSuggestions>>(emptyList())
+    val suggestions: StateFlow<List<SourceSuggestions>> = _suggestions.asStateFlow()
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            val sources = getEnabledSources.subscribe().first()
+                .filterNot { it.id == LocalSource.ID }
+                .sortedByDescending { it.isUsedLast || Pin.Actual in it.pin }
+                .take(SUGGESTION_SOURCES)
+            _suggestions.value = sources.mapNotNull { loadSuggestions(it) }
+        }
+    }
+
+    private suspend fun loadSuggestions(source: Source): SourceSuggestions? {
+        val catalogue = sourceManager.get(source.id) as? CatalogueSource ?: return null
+        return try {
+            val mangas = catalogue.getPopularManga(1).mangas
+                .take(SUGGESTIONS_PER_SOURCE)
+                .map { it.toDomainManga(source.id) }
+                .distinctBy { it.url }
+                .let { networkToLocalManga(it) }
+            SourceSuggestions(source, mangas).takeIf { mangas.isNotEmpty() }
+        } catch (e: Exception) {
+            logcat(LogPriority.WARN, e) { "Could not load suggestions from ${source.name}" }
+            null
+        }
+    }
 
     private fun toSourceUiModels(sources: List<Source>): List<SourceUiModel> {
         val map = TreeMap<String, MutableList<Source>> { d1, d2 ->
@@ -116,6 +156,9 @@ class SourcesViewModel(
     data class Dialog(val source: Source)
 
     @Immutable
+    data class SourceSuggestions(val source: Source, val mangas: List<Manga>)
+
+    @Immutable
     data class State(
         val dialog: Dialog? = null,
         val isLoading: Boolean = true,
@@ -127,5 +170,7 @@ class SourcesViewModel(
     companion object {
         const val PINNED_KEY = "pinned"
         const val LAST_USED_KEY = "last_used"
+        private const val SUGGESTION_SOURCES = 3
+        private const val SUGGESTIONS_PER_SOURCE = 15
     }
 }

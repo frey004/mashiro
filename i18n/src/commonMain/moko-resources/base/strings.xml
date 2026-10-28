@@ -1115,4 +1115,5 @@
     <string name="ext_show_sources">Show sources</string>
     <string name="theme_liquid_glass">Liquid glass</string>
     <string name="pref_liquid_glass_color">Glass color</string>
+    <string name="browse_popular_in">Popular in %1$s</string>
 </resources>

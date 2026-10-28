@@ -1,6 +1,10 @@
 package eu.kanade.presentation.browse
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import eu.kanade.presentation.manga.components.MangaCover
+import tachiyomi.domain.manga.model.Manga
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,9 +25,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import eu.kanade.presentation.browse.components.SourceIcon
-import eu.kanade.presentation.manga.components.AnilistDiscovery
-import eu.kanade.presentation.manga.components.CoverCarousel
-import eu.kanade.presentation.manga.components.MangaRecommendation
 import mihon.app.di.appGraph
 import mihon.icons.materialsymbols.rounded.Download
 import mihon.icons.materialsymbols.rounded.Folder
@@ -76,7 +77,8 @@ fun SourcesScreen(
     onClickGlobalSearch: () -> Unit,
     onClickDownloads: () -> Unit,
     onClickManageExtensions: () -> Unit,
-    onClickSuggestion: (title: String) -> Unit,
+    suggestions: List<SourcesViewModel.SourceSuggestions>,
+    onClickSuggestion: (Manga) -> Unit,
 ) {
     when {
         state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
@@ -94,6 +96,7 @@ fun SourcesScreen(
                 onClickGlobalSearch = onClickGlobalSearch,
                 onClickDownloads = onClickDownloads,
                 onClickManageExtensions = onClickManageExtensions,
+                suggestions = suggestions,
                 onClickSuggestion = onClickSuggestion,
             )
         }
@@ -113,13 +116,9 @@ private fun SourcesGrid(
     onClickGlobalSearch: () -> Unit,
     onClickDownloads: () -> Unit,
     onClickManageExtensions: () -> Unit,
-    onClickSuggestion: (title: String) -> Unit,
+    suggestions: List<SourcesViewModel.SourceSuggestions>,
+    onClickSuggestion: (Manga) -> Unit,
 ) {
-    val context = LocalContext.current
-    val client = remember { context.appGraph.networkHelper.client }
-    val suggestions by produceState(initialValue = emptyList<MangaRecommendation>()) {
-        value = AnilistDiscovery.trending(client)
-    }
     val sources = remember(state.items) {
         state.items
             .filterIsInstance<SourceUiModel.Item>()
@@ -156,11 +155,11 @@ private fun SourcesGrid(
             }
         }
 
-        if (suggestions.isNotEmpty()) {
-            item(span = { GridItemSpan(maxLineSpan) }, key = "suggestions") {
-                CoverCarousel(
-                    title = stringResource(MR.strings.browse_suggestions),
-                    items = suggestions,
+        suggestions.forEach { suggestion ->
+            item(span = { GridItemSpan(maxLineSpan) }, key = "suggestions-${suggestion.source.id}") {
+                SuggestionCarousel(
+                    title = stringResource(MR.strings.browse_popular_in, suggestion.source.name),
+                    mangas = suggestion.mangas,
                     onClick = onClickSuggestion,
                 )
             }
@@ -188,6 +187,44 @@ private fun SourcesGrid(
                 onClick = { onClickItem(source, Listing.Popular) },
                 onLongClick = { onLongClickItem(source) },
             )
+        }
+    }
+}
+
+/** Fila de portadas de una extensión; al tocar se abre la ficha del manga en esa extensión. */
+@Composable
+private fun SuggestionCarousel(
+    title: String,
+    mangas: List<Manga>,
+    onClick: (Manga) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            items(mangas, key = { it.id }) { manga ->
+                Column(modifier = Modifier.width(110.dp)) {
+                    MangaCover.Book(
+                        data = manga,
+                        contentDescription = manga.title,
+                        onClick = { onClick(manga) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Text(
+                        text = manga.title,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
         }
     }
 }

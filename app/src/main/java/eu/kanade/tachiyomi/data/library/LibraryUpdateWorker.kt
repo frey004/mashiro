@@ -181,7 +181,10 @@ class LibraryUpdateWorker(private val context: Context, workerParams: WorkerPara
             }
         }
 
-        val restrictions = libraryPreferences.autoUpdateMangaRestrictions.get()
+        // Al actualizar a mano se revisan todas las entradas, aunque tengan capítulos sin leer,
+        // estén completadas o fuera de su periodo de publicación
+        val isManualUpdate = tags.contains(WORK_NAME_MANUAL)
+        val restrictions = if (isManualUpdate) emptySet() else libraryPreferences.autoUpdateMangaRestrictions.get()
         val skippedUpdates = mutableListOf<Pair<Manga, String?>>()
         val timeZone = TimeZone.currentSystemDefault()
         val fetchWindowUpperBound = fetchInterval.getWindow(
@@ -192,7 +195,9 @@ class LibraryUpdateWorker(private val context: Context, workerParams: WorkerPara
         mangaToUpdate = listToUpdate
             .filter {
                 when {
-                    it.manga.updateStrategy == UpdateStrategy.ONLY_FETCH_ONCE && it.totalChapters > 0L -> {
+                    !isManualUpdate &&
+                        it.manga.updateStrategy == UpdateStrategy.ONLY_FETCH_ONCE &&
+                        it.totalChapters > 0L -> {
                         skippedUpdates.add(
                             it.manga to context.stringResource(MR.strings.skipped_reason_not_always_update),
                         )
