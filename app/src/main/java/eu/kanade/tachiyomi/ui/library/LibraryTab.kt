@@ -57,6 +57,7 @@ import tachiyomi.domain.manga.model.Manga
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
+import tachiyomi.presentation.core.components.glass.LocalGlassNavigation
 import tachiyomi.presentation.core.screens.EmptyScreen
 import tachiyomi.presentation.core.screens.EmptyScreenAction
 import tachiyomi.presentation.core.screens.LoadingScreen
@@ -92,6 +93,7 @@ data object LibraryTab : Tab {
         val state by viewModel.state.collectAsStateWithLifecycle()
 
         val snackbarHostState = remember { SnackbarHostState() }
+        val glassNavigation = LocalGlassNavigation.current
 
         val onClickRefresh: suspend (Category?) -> Boolean = { category ->
             val started = LibraryUpdateWorker.startNow(context.workManager, category)
@@ -138,7 +140,12 @@ data object LibraryTab : Tab {
                     searchQuery = state.searchQuery,
                     onSearchQueryChange = viewModel::search,
                     // For scroll overlay when no tab
-                    scrollBehavior = scrollBehavior.takeIf { !state.showCategoryTabs },
+                    scrollBehavior = scrollBehavior.takeIf { !state.showCategoryTabs || glassNavigation },
+                    // Con liquid glass no hay pestaña "Más": se abre desde el engranaje
+                    onClickSettings = {
+                        scope.launch { HomeScreen.openTab(HomeScreen.Tab.More(toDownloads = false)) }
+                        Unit
+                    }.takeIf { glassNavigation },
                 )
             },
             bottomBar = {
@@ -214,6 +221,7 @@ data object LibraryTab : Tab {
                         getDisplayMode = { viewModel.getDisplayMode() },
                         getColumnsForOrientation = { viewModel.getColumnsForOrientation(it) },
                         getItemsForCategory = { state.getItemsForCategory(it) },
+                        glassCategorySelector = glassNavigation,
                     )
                 }
             }

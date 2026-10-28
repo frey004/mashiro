@@ -19,6 +19,7 @@ import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.rounded.FilterList
 import mihon.icons.materialsymbols.rounded.FlipToBack
 import mihon.icons.materialsymbols.rounded.SelectAll
+import mihon.icons.materialsymbols.rounded.Settings
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.components.Pill
 import tachiyomi.presentation.core.i18n.stringResource
@@ -39,6 +40,7 @@ fun LibraryToolbar(
     searchQuery: String?,
     onSearchQueryChange: (String?) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior?,
+    onClickSettings: (() -> Unit)? = null,
 ) = when {
     selectedCount > 0 -> LibrarySelectionToolbar(
         selectedCount = selectedCount,
@@ -56,6 +58,7 @@ fun LibraryToolbar(
         onClickGlobalUpdate = onClickGlobalUpdate,
         onClickOpenRandomManga = onClickOpenRandomManga,
         scrollBehavior = scrollBehavior,
+        onClickSettings = onClickSettings,
     )
 }
 
@@ -70,6 +73,7 @@ private fun LibraryRegularToolbar(
     onClickGlobalUpdate: () -> Unit,
     onClickOpenRandomManga: () -> Unit,
     scrollBehavior: TopAppBarScrollBehavior?,
+    onClickSettings: (() -> Unit)?,
 ) {
     val pillAlpha = if (isSystemInDarkTheme()) 0.12f else 0.08f
     SearchToolbar(
@@ -95,13 +99,20 @@ private fun LibraryRegularToolbar(
         actions = {
             val filterTint = if (hasFilters) MaterialTheme.colorScheme.active else LocalContentColor.current
             AppBarActions(
-                listOf(
+                listOfNotNull(
                     AppBar.Action(
                         title = stringResource(MR.strings.action_filter),
                         icon = MaterialSymbols.Rounded.FilterList,
                         iconTint = filterTint,
                         onClick = onClickFilter,
                     ),
+                    onClickSettings?.let {
+                        AppBar.Action(
+                            title = stringResource(MR.strings.label_settings),
+                            icon = MaterialSymbols.Rounded.Settings,
+                            onClick = it,
+                        )
+                    },
                     AppBar.OverflowAction(
                         title = stringResource(MR.strings.action_update_library),
                         onClick = onClickGlobalUpdate,

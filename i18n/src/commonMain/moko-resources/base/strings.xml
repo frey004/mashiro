@@ -1093,4 +1093,11 @@
     <string name="donationCampaign.paragraph3">Regardless, Mihon will continue to be maintained by me and the volunteers, and it will stay open source.</string>
     <string name="donationCampaign.contactPlatform">Discord</string>
     <string name="donationCampaign.dismiss">Dismiss</string>
+    <string name="pref_category_liquid_glass">Liquid glass</string>
+    <string name="pref_liquid_glass">Liquid glass interface</string>
+    <string name="pref_liquid_glass_summary">Floating translucent navigation bar and category selector. Blur requires Android 12 or newer</string>
+    <string name="pref_liquid_glass_blur">Blur intensity</string>
+    <string name="pref_liquid_glass_transparency">Transparency</string>
+    <string name="action_previous_category">Previous category</string>
+    <string name="action_next_category">Next category</string>
 </resources>

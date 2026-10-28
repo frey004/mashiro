@@ -49,6 +49,14 @@ class UiPreferences(
 
     val imagesInDescription: Preference<Boolean> = preferenceStore.getBoolean("pref_render_images_description", true)
 
+    val liquidGlass: Preference<Boolean> = preferenceStore.getBoolean("pref_liquid_glass", true)
+
+    /** Desenfoque del cristal en dp. */
+    val liquidGlassBlur: Preference<Int> = preferenceStore.getInt("pref_liquid_glass_blur", 24)
+
+    /** Transparencia del cristal en porcentaje (0 = opaco). */
+    val liquidGlassTransparency: Preference<Int> = preferenceStore.getInt("pref_liquid_glass_transparency", 55)
+
     companion object {
         fun dateFormat(format: String, locale: Locale): DateTimeFormatter = when (format) {
             "" -> DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT).withLocale(locale)

@@ -44,6 +44,7 @@ object SettingsAppearanceScreen : SearchableSettings {
 
         return listOf(
             getThemeGroup(uiPreferences = uiPreferences),
+            getLiquidGlassGroup(uiPreferences = uiPreferences),
             getDisplayGroup(uiPreferences = uiPreferences),
         )
     }
@@ -93,6 +94,38 @@ object SettingsAppearanceScreen : SearchableSettings {
                         (context as? Activity)?.let { ActivityCompat.recreate(it) }
                         true
                     },
+                ),
+            ),
+        )
+    }
+
+    @Composable
+    private fun getLiquidGlassGroup(
+        uiPreferences: UiPreferences,
+    ): Preference.PreferenceGroup {
+        val enabled by uiPreferences.liquidGlass.collectAsState()
+
+        return Preference.PreferenceGroup(
+            title = stringResource(MR.strings.pref_category_liquid_glass),
+            preferenceItems = listOf(
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = uiPreferences.liquidGlass,
+                    title = stringResource(MR.strings.pref_liquid_glass),
+                    subtitle = stringResource(MR.strings.pref_liquid_glass_summary),
+                ),
+                Preference.PreferenceItem.SliderPreference(
+                    preference = uiPreferences.liquidGlassBlur,
+                    valueRange = 0..48 step 4,
+                    title = stringResource(MR.strings.pref_liquid_glass_blur),
+                    valueText = { "$it dp" },
+                    visible = enabled,
+                ),
+                Preference.PreferenceItem.SliderPreference(
+                    preference = uiPreferences.liquidGlassTransparency,
+                    valueRange = 0..90 step 5,
+                    title = stringResource(MR.strings.pref_liquid_glass_transparency),
+                    valueText = { "$it%" },
+                    visible = enabled,
                 ),
             ),
         )

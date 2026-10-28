@@ -893,4 +893,11 @@
     <string name="extensionStoresScreen.deleteStore.title">Quitar listado de extensiones</string>
     <string name="extensionStoresScreen.deleteStore.body">¿Seguro que quieres quitar el listado de extensiones «%1$s» (%2$s)?</string>
     <string name="pref_webtoon_vertical_navigator_on_left">Ubicar la interfaz de navegación en el margen izquierdo</string>
+    <string name="pref_category_liquid_glass">Liquid glass</string>
+    <string name="pref_liquid_glass">Interfaz liquid glass</string>
+    <string name="pref_liquid_glass_summary">Barra de navegación y selector de categorías flotantes y translúcidos. El desenfoque requiere Android 12 o superior</string>
+    <string name="pref_liquid_glass_blur">Intensidad del desenfoque</string>
+    <string name="pref_liquid_glass_transparency">Transparencia</string>
+    <string name="action_previous_category">Categoría anterior</string>
+    <string name="action_next_category">Categoría siguiente</string>
 </resources>
