@@ -46,13 +46,17 @@ internal fun LibraryCompactGrid(
                 ),
                 coverBadgeStart = {
                     DownloadsBadge(count = libraryItem.badges.downloadCount)
-                    UnreadBadge(count = libraryItem.badges.unreadCount)
-                },
-                coverBadgeEnd = {
                     LanguageBadge(
                         isLocal = libraryItem.badges.isLocal,
                         sourceLanguage = libraryItem.badges.sourceLanguage,
                     )
+                },
+                coverBadgeEnd = {
+                    ReadProgressBadge(
+                        readCount = libraryItem.libraryManga.readCount,
+                        totalCount = libraryItem.libraryManga.totalChapters,
+                    )
+                    UnreadBadge(count = libraryItem.badges.unreadCount)
                 },
                 onLongClick = { onLongClick(libraryItem.libraryManga) },
                 onClick = { onClick(libraryItem.libraryManga) },

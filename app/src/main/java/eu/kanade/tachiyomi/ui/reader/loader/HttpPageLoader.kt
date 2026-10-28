@@ -10,6 +10,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.Mutex
+import eu.kanade.tachiyomi.network.HttpException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -33,6 +36,11 @@ internal class HttpPageLoader(
     private val chunkProcessLock = Any()
     private var chunkProcessJob: Job? = null
     private val downloadJobs = ConcurrentHashMap<Int, Job>()
+
+    // Las direcciones de las imágenes guardadas en caché pueden caducar (la web responde 404);
+    // en ese caso se pide de nuevo la lista de páginas una sola vez
+    private val pageListRefreshMutex = Mutex()
+    private var pageListRefreshed = false
 
     override var isLocal: Boolean = false
 
@@ -222,6 +230,28 @@ internal class HttpPageLoader(
      *
      * @param page the page whose source image has to be downloaded.
      */
+    /**
+     * Pide de nuevo la lista de páginas a la fuente y actualiza las direcciones de todas las páginas.
+     * Devuelve true si se refrescó (solo se hace una vez por capítulo abierto).
+     */
+    private suspend fun refreshPageList(): Boolean = pageListRefreshMutex.withLock {
+        if (pageListRefreshed) return@withLock true
+        val freshPages = try {
+            source.getPageList(chapter.chapter.toSChapter())
+        } catch (e: Throwable) {
+            if (e is CancellationException) throw e
+            return@withLock false
+        }
+        chapter.pages?.forEach { readerPage ->
+            freshPages.getOrNull(readerPage.index)?.let { fresh ->
+                readerPage.imageUrl = fresh.imageUrl
+            }
+        }
+        chapterCache.putPageListToCache(chapter.chapter, freshPages)
+        pageListRefreshed = true
+        true
+    }
+
     private suspend fun internalLoadPage(page: ReaderPage, force: Boolean = false) {
         try {
             if (page.imageUrl.isNullOrEmpty()) {
@@ -230,13 +260,24 @@ internal class HttpPageLoader(
             }
             val imageUrl = page.imageUrl!!
 
-            if (force || !chapterCache.isImageInCache(imageUrl)) {
+            var currentUrl = imageUrl
+            if (force || !chapterCache.isImageInCache(currentUrl)) {
                 page.status = Page.State.DownloadImage
-                val imageResponse = source.getImage(page)
-                chapterCache.putImageToCache(imageUrl, imageResponse)
+                val imageResponse = try {
+                    source.getImage(page)
+                } catch (e: HttpException) {
+                    if (e.code !in EXPIRED_URL_CODES || !refreshPageList()) throw e
+                    if (page.imageUrl.isNullOrEmpty()) {
+                        page.imageUrl = source.getImageUrl(page)
+                    }
+                    currentUrl = page.imageUrl!!
+                    source.getImage(page)
+                }
+                chapterCache.putImageToCache(currentUrl, imageResponse)
             }
 
-            page.stream = { chapterCache.getImageFile(imageUrl).inputStream() }
+            val finalUrl = currentUrl
+            page.stream = { chapterCache.getImageFile(finalUrl).inputStream() }
             page.status = Page.State.Ready
         } catch (e: Throwable) {
             if (e is CancellationException) {
@@ -251,3 +292,5 @@ internal class HttpPageLoader(
 }
 
 private const val LIMITED_PAGES_AHEAD = 4
+
+private val EXPIRED_URL_CODES = setOf(403, 404, 410)
