@@ -1,6 +1,9 @@
 name: Build APK
 on:
   push:
+    # Solo la rama principal publica versiones; las ramas mihon-update/* se prueban en su propio workflow
+    branches:
+      - ccr-3832c3c9-t236r7
     paths-ignore:
       - '**.md'
       - 'fastlane/**'

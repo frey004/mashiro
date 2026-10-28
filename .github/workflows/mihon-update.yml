@@ -1,0 +1,153 @@
+name: Mihon update
+on:
+  schedule:
+    # Lunes 14:17 UTC
+    - cron: '17 14 * * 1'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Versión de Mihon a probar (vacío = la última release)'
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  update:
+    name: Merge latest Mihon release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # Token personal (Contents, Pull requests y Workflows en escritura). Sin él no se puede subir la rama:
+      # GitHub no deja que el token de Actions suba commits de Mihon que tocan .github/workflows
+      SYNC_TOKEN: ${{ secrets.MIHON_SYNC_TOKEN }}
+      BASE: ${{ github.event.repository.default_branch }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.MIHON_SYNC_TOKEN || github.token }}
+
+      - name: Find Mihon release
+        id: check
+        run: |
+          tag="${{ inputs.tag }}"
+          if [ -z "$tag" ]; then
+            tag=$(gh api repos/mihonapp/mihon/releases/latest --jq .tag_name)
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "branch=mihon-update/$tag" >> "$GITHUB_OUTPUT"
+          git fetch --no-tags https://github.com/mihonapp/mihon "refs/tags/$tag:refs/tags/$tag"
+
+          if git merge-base --is-ancestor "$tag" HEAD; then
+            echo "ましろ ya incluye Mihon $tag"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$(gh issue list --state open --search "\"Mihon $tag\" in:title" --json number --jq '.[]')" ] \
+            || git ls-remote --exit-code --heads origin "mihon-update/$tag" > /dev/null; then
+            echo "Mihon $tag ya tiene un aviso o una rama abiertos"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Merge
+        id: merge
+        if: steps.check.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${{ steps.check.outputs.branch }}"
+
+          if git merge --no-ff --no-commit "$TAG"; then
+            :
+          else
+            # .github es propio de ましろ (workflows y logo): ante un choque se queda nuestra versión
+            git diff --name-only --diff-filter=U -- .github | while read -r f; do
+              if git cat-file -e "HEAD:$f" 2>/dev/null; then
+                git checkout --ours -- "$f" && git add -- "$f"
+              else
+                git rm -q -- "$f"
+              fi
+            done
+          fi
+          # Workflows nuevos de Mihon (releases, web, etc.) no se usan en ましろ
+          for f in .github/workflows/*; do
+            git cat-file -e "HEAD:$f" 2>/dev/null || git rm -q -f -- "$f"
+          done
+
+          conflicts=$(git diff --name-only --diff-filter=U)
+          if [ -n "$conflicts" ]; then
+            {
+              echo "conflicts<<EOF"
+              echo "$conflicts"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            git merge --abort
+            exit 0
+          fi
+          git commit -q -m "Merge Mihon $TAG"
+
+      - name: Set up JDK
+        if: steps.check.outputs.skip == 'false' && steps.merge.outputs.conflicts == ''
+        uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          java-version-file: .github/.java-version
+          distribution: temurin
+
+      - name: Set up Gradle
+        if: steps.check.outputs.skip == 'false' && steps.merge.outputs.conflicts == ''
+        uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+
+      # Solo comprueba que compila (firmado con la clave debug del runner); la versión real la publica Build APK
+      - name: Build app
+        id: build
+        if: steps.check.outputs.skip == 'false' && steps.merge.outputs.conflicts == ''
+        continue-on-error: true
+        run: ./gradlew assembleRelease -Pinclude-telemetry=false -Penable-updater=true -Dorg.gradle.isolated-projects=false --no-configuration-cache
+
+      - name: Open pull request or report
+        if: steps.check.outputs.skip == 'false'
+        env:
+          TAG: ${{ steps.check.outputs.tag }}
+          BRANCH: ${{ steps.check.outputs.branch }}
+          CONFLICTS: ${{ steps.merge.outputs.conflicts }}
+          BUILD: ${{ steps.build.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          notes="https://github.com/mihonapp/mihon/releases/tag/$TAG"
+
+          if [ -n "$CONFLICTS" ]; then
+            body=$(printf 'Salió **Mihon %s** (%s), pero sus cambios chocan con los de ましろ en estos archivos:\n\n```\n%s\n```\n\nPídele a Claude: *"Actualiza ましろ a Mihon %s"*.' \
+              "$TAG" "$notes" "$CONFLICTS" "$TAG")
+            gh issue create --title "Mihon $TAG: hay choques al mezclar" --body "$body"
+            exit 0
+          fi
+
+          if [ "$BUILD" != "success" ]; then
+            body=$(printf 'Salió **Mihon %s** (%s). Se mezcla sin choques, pero la app no compila: %s\n\nPídele a Claude: *"Actualiza ましろ a Mihon %s"*.' \
+              "$TAG" "$notes" "$RUN_URL" "$TAG")
+            gh issue create --title "Mihon $TAG: se mezcla pero no compila" --body "$body"
+            exit 0
+          fi
+
+          if [ -z "$SYNC_TOKEN" ]; then
+            body=$(printf 'Salió **Mihon %s** (%s). Se mezcla sin choques y compila (%s).\n\nPara que la próxima vez se abra un pull request que solo tengas que aprobar, añade el secreto MIHON_SYNC_TOKEN. Mientras tanto, pídele a Claude: *"Actualiza ましろ a Mihon %s"*.' \
+              "$TAG" "$notes" "$RUN_URL" "$TAG")
+            gh issue create --title "Mihon $TAG: lista para aplicar" --body "$body"
+            exit 0
+          fi
+
+          git push -u origin "$BRANCH"
+          GH_TOKEN="$SYNC_TOKEN" gh pr create --base "$BASE" --head "$BRANCH" \
+            --title "Actualizar a Mihon $TAG" \
+            --body "$(printf 'Mezcla **Mihon %s** con ましろ. Se mezcló sin choques y compila (%s).\n\nNovedades: %s\n\nAl aprobar (**Merge pull request**) se publica la nueva versión y llega por el actualizador de la app.' "$TAG" "$RUN_URL" "$notes")"
