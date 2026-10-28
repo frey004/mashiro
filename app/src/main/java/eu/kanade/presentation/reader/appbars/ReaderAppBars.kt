@@ -26,6 +26,18 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import mihon.app.di.appGraph
+import tachiyomi.presentation.core.components.glass.GlassStyle
+import tachiyomi.presentation.core.components.glass.GlassSurface
+import tachiyomi.presentation.core.components.glass.LocalGlassStyle
+import tachiyomi.presentation.core.util.collectAsState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,19 +87,36 @@ fun ReaderAppBars(
     onClickCropBorder: () -> Unit,
     onClickSettings: () -> Unit,
 ) {
-    val backgroundColor = MaterialTheme.colorScheme
-        .surfaceColorAtElevation(3.dp)
-        .copy(alpha = if (isSystemInDarkTheme()) 0.9f else 0.95f)
+    val context = LocalContext.current
+    val uiPreferences = remember { context.appGraph.uiPreferences }
+    val glassEnabled by uiPreferences.liquidGlass.collectAsState()
+    val glassTransparency by uiPreferences.liquidGlassTransparency.collectAsState()
+    val glassColor by uiPreferences.liquidGlassColor.collectAsState()
+    // En el lector el cristal es algo más opaco para que el texto se lea sobre las páginas
+    val glassStyle = GlassStyle(
+        enabled = glassEnabled,
+        opacity = (1f - glassTransparency / 100f).coerceAtLeast(0.7f),
+        tint = Color(glassColor),
+    )
 
+    CompositionLocalProvider(LocalGlassStyle provides glassStyle) {
     Column(modifier = Modifier.fillMaxHeight()) {
         AnimatedVisibility(
             visible = visible,
             enter = slideInVertically(readerBarsSlideAnimationSpec) { -it } + fadeIn(readerBarsFadeAnimationSpec),
             exit = slideOutVertically(readerBarsSlideAnimationSpec) { -it } + fadeOut(readerBarsFadeAnimationSpec),
         ) {
+            // Barra superior flotante de cristal
+            GlassSurface(
+                backdrop = null,
+                shape = ReaderBarShape,
+                modifier = Modifier
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
             ReaderTopBar(
                 modifier = Modifier
-                    .background(backgroundColor)
+                    .consumeWindowInsets(WindowInsets.statusBars)
                     .clickable(onClick = onClickTopAppBar),
                 mangaTitle = mangaTitle,
                 chapterTitle = chapterTitle,
@@ -98,6 +127,7 @@ fun ReaderAppBars(
                 onOpenInBrowser = onOpenInBrowser,
                 onShare = onShare,
             )
+            }
         }
 
         if (!chapterNavigatorType.isHorizontal()) {
@@ -160,12 +190,18 @@ fun ReaderAppBars(
                         onPageIndexChangeFinished = onPageIndexChangeFinished,
                     )
                 }
+                // Barra inferior flotante de cristal
+                GlassSurface(
+                    backdrop = null,
+                    shape = ReaderBarShape,
+                    modifier = Modifier
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+                ) {
                 ReaderBottomBar(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(backgroundColor)
-                        .padding(horizontal = MaterialTheme.padding.small)
-                        .windowInsetsPadding(WindowInsets.navigationBars),
+                        .padding(horizontal = MaterialTheme.padding.small, vertical = 4.dp),
                     readingMode = readingMode,
                     onClickReadingMode = onClickReadingMode,
                     orientation = orientation,
@@ -174,7 +210,11 @@ fun ReaderAppBars(
                     onClickCropBorder = onClickCropBorder,
                     onClickSettings = onClickSettings,
                 )
+                }
             }
         }
     }
+    }
 }
+
+private val ReaderBarShape = RoundedCornerShape(28.dp)
