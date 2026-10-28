@@ -33,8 +33,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.statusBars
-import eu.kanade.presentation.reader.components.InkSurface
 import eu.kanade.presentation.reader.components.ChapterNavigator
 import eu.kanade.presentation.reader.components.ChapterNavigatorType
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
@@ -87,13 +85,9 @@ fun ReaderAppBars(
             enter = slideInVertically(readerBarsSlideAnimationSpec) { -it } + fadeIn(readerBarsFadeAnimationSpec),
             exit = slideOutVertically(readerBarsSlideAnimationSpec) { -it } + fadeOut(readerBarsFadeAnimationSpec),
         ) {
-            // Barra superior de raíces, de borde a borde
-            InkSurface(
-                modifier = Modifier.fillMaxWidth(),
-                seed = 1,
-            ) {
             ReaderTopBar(
                 modifier = Modifier
+                    .background(backgroundColor)
                     .clickable(onClick = onClickTopAppBar),
                 mangaTitle = mangaTitle,
                 chapterTitle = chapterTitle,
@@ -104,7 +98,6 @@ fun ReaderAppBars(
                 onOpenInBrowser = onOpenInBrowser,
                 onShare = onShare,
             )
-            }
         }
 
         if (!chapterNavigatorType.isHorizontal()) {
@@ -167,17 +160,12 @@ fun ReaderAppBars(
                         onPageIndexChangeFinished = onPageIndexChangeFinished,
                     )
                 }
-                // Barra inferior de raíces, de borde a borde
-                InkSurface(
-                    modifier = Modifier.fillMaxWidth(),
-                    seed = 2,
-                ) {
                 ReaderBottomBar(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(backgroundColor)
                         .padding(horizontal = MaterialTheme.padding.small)
-                        .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(vertical = 6.dp),
+                        .windowInsetsPadding(WindowInsets.navigationBars),
                     readingMode = readingMode,
                     onClickReadingMode = onClickReadingMode,
                     orientation = orientation,
@@ -186,7 +174,6 @@ fun ReaderAppBars(
                     onClickCropBorder = onClickCropBorder,
                     onClickSettings = onClickSettings,
                 )
-                }
             }
         }
     }
