@@ -49,14 +49,11 @@ class LibraryPreferences(
             DEVICE_ONLY_ON_WIFI,
         ),
     )
+    // Por defecto se actualizan todas las entradas (Mihon omitía las que tienen capítulos sin leer,
+    // las no empezadas, las terminadas y las que están fuera de su periodo de publicación)
     val autoUpdateMangaRestrictions: Preference<Set<String>> = preferenceStore.getStringSet(
         "library_update_manga_restriction",
-        setOf(
-            MANGA_HAS_UNREAD,
-            MANGA_NON_COMPLETED,
-            MANGA_NON_READ,
-            MANGA_OUTSIDE_RELEASE_PERIOD,
-        ),
+        emptySet(),
     )
 
     val autoUpdateMetadata: Preference<Boolean> = preferenceStore.getBoolean("auto_update_metadata", false)
