@@ -56,6 +56,7 @@ import eu.kanade.tachiyomi.util.storage.DiskUtil
 import eu.kanade.tachiyomi.util.storage.cacheImageDir
 import eu.kanade.tachiyomi.util.system.activeNetworkState
 import kotlinx.coroutines.CancellationException
+import mihon.domain.source.interactor.UpdateMangaFromRemote
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -129,6 +130,7 @@ class ReaderViewModel(
     private val coverCache: CoverCache,
     private val chapterCache: ChapterCache,
     private val downloadCache: DownloadCache,
+    private val updateMangaFromRemote: UpdateMangaFromRemote,
 ) : ViewModel() {
 
     @AssistedFactory
@@ -365,7 +367,19 @@ class ReaderViewModel(
                 )
 
                 chapterList = loadChapterList()
-                loadChapter(loader!!, chapterList.first { chapterId == it.chapter.id })
+                try {
+                    loadChapter(loader!!, chapterList.first { chapterId == it.chapter.id })
+                } catch (e: Throwable) {
+                    if (e is CancellationException || source !is HttpSource) throw e
+                    // Los capítulos restaurados de una copia pueden no tener datos que la extensión
+                    // necesita (p. ej. el memo); se actualiza la lista desde la fuente y se reintenta
+                    logcat(LogPriority.WARN, e) { "Refreshing chapters after failing to load chapter $chapterId" }
+                    if (updateMangaFromRemote(source, manga, fetchChapters = true, manualFetch = true).isFailure) {
+                        throw e
+                    }
+                    chapterList = loadChapterList()
+                    loadChapter(loader!!, chapterList.first { chapterId == it.chapter.id })
+                }
             } catch (e: Throwable) {
                 if (e is CancellationException) {
                     throw e
