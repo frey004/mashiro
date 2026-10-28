@@ -224,6 +224,8 @@ dependencies {
 
     // Compose
     implementation(libs.androidx.activity.compose)
+    // Inicio de sesión con Google para sincronizar copias con Google Drive
+    implementation(libs.play.services.auth)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.animation)

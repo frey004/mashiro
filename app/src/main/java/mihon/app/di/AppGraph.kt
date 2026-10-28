@@ -124,6 +124,7 @@ interface AppGraph : ViewModelGraph {
     val addTracks: AddTracks
     val upsertTrack: UpsertTrack
     val networkToLocalManga: NetworkToLocalManga
+    val backupCreatorFactory: eu.kanade.tachiyomi.data.backup.create.BackupCreator.Factory
 
     val getExtensionStoreCountAsFlow: GetExtensionStoreCountAsFlow
 

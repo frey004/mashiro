@@ -918,4 +918,18 @@
     <string name="browse_popular_in">Populares en %1$s</string>
     <string name="pref_library_update_smart_update_summary">Solo se aplica a las actualizaciones automáticas. Al actualizar a mano se revisan todas las entradas</string>
     <string name="manga_recommendations_in">Recomendados en %1$s</string>
+    <string name="google_drive">Google Drive</string>
+    <string name="google_drive_connect">Conectar Google Drive</string>
+    <string name="google_drive_reconnect">Volver a conectar Google Drive</string>
+    <string name="google_drive_connect_summary">Las copias se guardan en una carpeta privada de la app dentro de tu Drive</string>
+    <string name="google_drive_connected">Google Drive conectado</string>
+    <string name="google_drive_connect_failed">No se pudo conectar Google Drive</string>
+    <string name="google_drive_backup_now">Subir copia ahora</string>
+    <string name="google_drive_uploading">Creando y subiendo la copia…</string>
+    <string name="google_drive_uploaded">Copia subida: %1$s</string>
+    <string name="google_drive_restore">Restaurar desde Google Drive</string>
+    <string name="google_drive_no_backups">Todavía no hay copias en Google Drive</string>
+    <string name="google_drive_downloading">Descargando la copia…</string>
+    <string name="google_drive_auto_upload">Subir las copias automáticas</string>
+    <string name="google_drive_auto_upload_summary">Cada copia automática también se sube a Google Drive (se guardan las 10 últimas)</string>
 </resources>

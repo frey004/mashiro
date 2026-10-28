@@ -25,6 +25,7 @@ import eu.kanade.tachiyomi.util.system.isRunning
 import eu.kanade.tachiyomi.util.system.setForegroundSafely
 import eu.kanade.tachiyomi.util.system.workManager
 import kotlinx.coroutines.Dispatchers
+import mihon.feature.drivesync.GoogleDriveSync
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import mihon.app.di.AppGraph
@@ -70,6 +71,16 @@ class BackupCreateWorker(private val context: Context, workerParams: WorkerParam
                 }
             if (!isAutoBackup) {
                 notifier.showBackupComplete(UniFile.fromUri(context, location.toUri())!!)
+            }
+            // Subir también la copia automática a Google Drive si está conectado
+            val backupPreferences = graph.backupPreferences
+            if (isAutoBackup && backupPreferences.googleDriveConnected.get() && backupPreferences.googleDriveAutoUpload.get()) {
+                try {
+                    val name = UniFile.fromUri(context, location.toUri())?.name ?: "mashiro_auto.tachibk"
+                    GoogleDriveSync.uploadExisting(context, location.toUri(), name)
+                } catch (e: Exception) {
+                    logcat(LogPriority.WARN, e) { "Could not upload backup to Google Drive" }
+                }
             }
             Result.success()
         } catch (e: Exception) {

@@ -1118,4 +1118,18 @@
     <string name="browse_popular_in">Popular in %1$s</string>
     <string name="pref_library_update_smart_update_summary">Only applies to automatic updates. Manual refresh always checks every entry</string>
     <string name="manga_recommendations_in">Recommended in %1$s</string>
+    <string name="google_drive">Google Drive</string>
+    <string name="google_drive_connect">Connect Google Drive</string>
+    <string name="google_drive_reconnect">Reconnect Google Drive</string>
+    <string name="google_drive_connect_summary">Backups are stored in a private app folder in your Drive</string>
+    <string name="google_drive_connected">Google Drive connected</string>
+    <string name="google_drive_connect_failed">Could not connect Google Drive</string>
+    <string name="google_drive_backup_now">Upload backup now</string>
+    <string name="google_drive_uploading">Creating and uploading backup…</string>
+    <string name="google_drive_uploaded">Backup uploaded: %1$s</string>
+    <string name="google_drive_restore">Restore from Google Drive</string>
+    <string name="google_drive_no_backups">There are no backups in Google Drive yet</string>
+    <string name="google_drive_downloading">Downloading backup…</string>
+    <string name="google_drive_auto_upload">Upload automatic backups</string>
+    <string name="google_drive_auto_upload_summary">Each automatic backup is also uploaded to Google Drive (the last 10 are kept)</string>
 </resources>

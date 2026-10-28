@@ -6,34 +6,48 @@ import android.net.Uri
 import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.IntentSenderRequest
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreWorker
+import eu.kanade.tachiyomi.data.backup.restore.RestoreOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import logcat.LogPriority
+import mihon.feature.drivesync.GoogleDriveSync
+import tachiyomi.core.common.i18n.stringResource
+import tachiyomi.core.common.util.system.logcat
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MultiChoiceSegmentedButtonRow
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.core.net.toUri
@@ -48,23 +62,17 @@ import eu.kanade.presentation.more.settings.widget.BasePreferenceWidget
 import eu.kanade.presentation.more.settings.widget.PrefsHorizontalPadding
 import eu.kanade.presentation.util.relativeTimeSpanString
 import eu.kanade.tachiyomi.data.backup.create.BackupCreateWorker
-import eu.kanade.tachiyomi.data.backup.restore.BackupRestoreWorker
 import eu.kanade.tachiyomi.data.export.LibraryExporter
 import eu.kanade.tachiyomi.data.export.LibraryExporter.ExportOptions
 import eu.kanade.tachiyomi.util.system.DeviceUtil
 import eu.kanade.tachiyomi.util.system.toast
 import eu.kanade.tachiyomi.util.system.workManager
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import logcat.LogPriority
 import mihon.app.di.appGraph
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.automirroredrounded.Help
-import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.core.common.storage.displayablePath
-import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.backup.service.BackupPreferences
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.storage.service.StoragePreferences
@@ -104,6 +112,7 @@ object SettingsDataScreen : SearchableSettings {
             Preference.PreferenceItem.InfoPreference(stringResource(MR.strings.pref_storage_location_info)),
 
             getBackupAndRestoreGroup(backupPreferences = backupPreferences),
+            getGoogleDriveGroup(backupPreferences = backupPreferences),
             getDataGroup(),
             getExportGroup(),
         )
@@ -175,6 +184,122 @@ object SettingsDataScreen : SearchableSettings {
                     context.toast(MR.strings.file_picker_error)
                 }
             },
+        )
+    }
+
+    @Composable
+    private fun getGoogleDriveGroup(backupPreferences: BackupPreferences): Preference.PreferenceGroup {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val connected by backupPreferences.googleDriveConnected.collectAsState()
+        var remoteBackups by remember { mutableStateOf<List<GoogleDriveSync.RemoteBackup>?>(null) }
+
+        val consentLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.StartIntentSenderForResult(),
+        ) { result ->
+            when (GoogleDriveSync.resultFromIntent(context, result.data)) {
+                is GoogleDriveSync.AuthState.Authorized -> {
+                    backupPreferences.googleDriveConnected.set(true)
+                    context.toast(MR.strings.google_drive_connected)
+                }
+                else -> context.toast(MR.strings.google_drive_connect_failed)
+            }
+        }
+
+        fun runDrive(block: suspend () -> Unit) {
+            scope.launch {
+                try {
+                    block()
+                } catch (e: Exception) {
+                    logcat(LogPriority.ERROR, e)
+                    withContext(Dispatchers.Main) { context.toast(e.message) }
+                }
+            }
+        }
+
+        remoteBackups?.let { backups ->
+            AlertDialog(
+                onDismissRequest = { remoteBackups = null },
+                title = { Text(stringResource(MR.strings.google_drive_restore)) },
+                text = {
+                    if (backups.isEmpty()) {
+                        Text(stringResource(MR.strings.google_drive_no_backups))
+                    } else {
+                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            backups.forEach { backup ->
+                                Text(
+                                    text = backup.name,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            remoteBackups = null
+                                            runDrive {
+                                                context.toast(MR.strings.google_drive_downloading)
+                                                val uri = GoogleDriveSync.download(context, backup)
+                                                BackupRestoreWorker.start(context.workManager, uri, RestoreOptions())
+                                            }
+                                        }
+                                        .padding(vertical = 12.dp),
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { remoteBackups = null }) {
+                        Text(stringResource(MR.strings.action_cancel))
+                    }
+                },
+            )
+        }
+
+        return Preference.PreferenceGroup(
+            title = stringResource(MR.strings.google_drive),
+            preferenceItems = listOf(
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(
+                        if (connected) MR.strings.google_drive_reconnect else MR.strings.google_drive_connect,
+                    ),
+                    subtitle = stringResource(MR.strings.google_drive_connect_summary),
+                    onClick = {
+                        runDrive {
+                            when (val state = GoogleDriveSync.authorize(context)) {
+                                is GoogleDriveSync.AuthState.Authorized -> {
+                                    backupPreferences.googleDriveConnected.set(true)
+                                    context.toast(MR.strings.google_drive_connected)
+                                }
+                                is GoogleDriveSync.AuthState.NeedsConsent -> consentLauncher.launch(
+                                    IntentSenderRequest.Builder(state.pendingIntent.intentSender).build(),
+                                )
+                            }
+                        }
+                    },
+                ),
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.google_drive_backup_now),
+                    visible = connected,
+                    onClick = {
+                        runDrive {
+                            context.toast(MR.strings.google_drive_uploading)
+                            val name = GoogleDriveSync.backupNow(context)
+                            withContext(Dispatchers.Main) {
+                                context.toast(context.stringResource(MR.strings.google_drive_uploaded, name))
+                            }
+                        }
+                    },
+                ),
+                Preference.PreferenceItem.TextPreference(
+                    title = stringResource(MR.strings.google_drive_restore),
+                    visible = connected,
+                    onClick = { runDrive { remoteBackups = GoogleDriveSync.list(context) } },
+                ),
+                Preference.PreferenceItem.SwitchPreference(
+                    preference = backupPreferences.googleDriveAutoUpload,
+                    title = stringResource(MR.strings.google_drive_auto_upload),
+                    subtitle = stringResource(MR.strings.google_drive_auto_upload_summary),
+                    visible = connected,
+                ),
+            ),
         )
     }
 
