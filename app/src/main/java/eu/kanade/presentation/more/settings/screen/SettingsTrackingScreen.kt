@@ -57,6 +57,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mihon.app.di.appGraph
+import tachiyomi.core.common.i18n.stringResource
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.automirroredrounded.Help
 import mihon.icons.materialsymbols.rounded.Close
@@ -129,6 +130,24 @@ object SettingsTrackingScreen : SearchableSettings {
             Preference.PreferenceItem.SwitchPreference(
                 preference = trackPreferences.autoUpdateTrack,
                 title = stringResource(MR.strings.pref_auto_update_manga_sync),
+            ),
+            Preference.PreferenceItem.SwitchPreference(
+                preference = trackPreferences.autoTrackOnLibraryAdd,
+                title = stringResource(MR.strings.pref_auto_track_library_add),
+                subtitle = stringResource(MR.strings.pref_auto_track_library_add_summary),
+            ),
+            Preference.PreferenceItem.TextPreference(
+                title = stringResource(MR.strings.action_auto_track_library),
+                subtitle = stringResource(MR.strings.action_auto_track_library_summary),
+                onClick = {
+                    val appContext = context.applicationContext
+                    context.toast(MR.strings.auto_track_library_started)
+                    context.appGraph.addTracks.bindAutomaticTrackersForLibraryInBackground { linked ->
+                        withContext(Dispatchers.Main) {
+                            appContext.toast(appContext.stringResource(MR.strings.auto_track_library_finished, linked))
+                        }
+                    }
+                },
             ),
             Preference.PreferenceItem.ListPreference(
                 preference = trackPreferences.autoUpdateTrackOnMarkRead,

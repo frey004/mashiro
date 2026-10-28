@@ -8,14 +8,23 @@ import eu.kanade.tachiyomi.data.track.EnhancedTracker
 import eu.kanade.tachiyomi.data.track.Tracker
 import eu.kanade.tachiyomi.data.track.TrackerManager
 import eu.kanade.tachiyomi.source.Source
+import eu.kanade.domain.track.service.TrackPreferences
+import eu.kanade.tachiyomi.data.track.model.TrackSearch
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.chapter.interactor.GetChaptersByMangaId
+import mihon.core.metro.AppCoroutineScope
 import tachiyomi.domain.history.interactor.GetHistory
+import tachiyomi.domain.manga.interactor.GetLibraryManga
 import tachiyomi.domain.manga.model.Manga
+import tachiyomi.domain.track.interactor.GetTracks
 import tachiyomi.domain.track.interactor.UpsertTrack
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
 @Inject
@@ -25,6 +34,10 @@ class AddTracks(
     private val getChaptersByMangaId: GetChaptersByMangaId,
     private val trackerManager: TrackerManager,
     private val getHistory: GetHistory,
+    private val getTracks: GetTracks,
+    private val getLibraryManga: GetLibraryManga,
+    private val trackPreferences: TrackPreferences,
+    @AppCoroutineScope private val appScope: CoroutineScope,
 ) {
 
     // TODO: update all trackers based on common data
@@ -95,5 +108,64 @@ class AddTracks(
                     ) { "Could not match manga: ${manga.title} with service $service" }
                 }
             }
+
+        if (trackPreferences.autoTrackOnLibraryAdd.get()) {
+            bindAutomaticTrackers(manga)
+        }
     }
+
+    /**
+     * Vincula el manga con los servicios de seguimiento con sesión iniciada (AniList, MyAnimeList…)
+     * en los que aún no está, buscándolo por su título.
+     *
+     * @return número de servicios vinculados.
+     */
+    suspend fun bindAutomaticTrackers(manga: Manga): Int = withContext(Dispatchers.IO) {
+        var bound = 0
+        pendingAutomaticTrackers(manga).forEach { tracker ->
+            try {
+                val match = bestMatch(manga.title, tracker.search(manga.title)) ?: return@forEach
+                match.manga_id = manga.id
+                bind(tracker, match, manga.id)
+                bound++
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e) { "Could not auto track manga: ${manga.title} with service $tracker" }
+            }
+        }
+        bound
+    }
+
+    /** Vincula en segundo plano todos los mangas de la biblioteca que aún no tienen seguimiento. */
+    fun bindAutomaticTrackersForLibraryInBackground(onFinished: suspend (linkedManga: Int) -> Unit) {
+        appScope.launch {
+            var linked = 0
+            getLibraryManga.await()
+                .distinctBy { it.manga.id }
+                .forEach { libraryManga ->
+                    if (pendingAutomaticTrackers(libraryManga.manga).isEmpty()) return@forEach
+                    if (bindAutomaticTrackers(libraryManga.manga) > 0) linked++
+                    // Evita superar el límite de peticiones de los servicios
+                    delay(1.5.seconds)
+                }
+            onFinished(linked)
+        }
+    }
+
+    private suspend fun pendingAutomaticTrackers(manga: Manga): List<Tracker> {
+        val trackedIds = getTracks.await(manga.id).map { it.trackerId }.toSet()
+        return trackerManager.loggedInTrackers()
+            .filter { it !is EnhancedTracker && it.id !in trackedIds }
+    }
+
+    private fun bestMatch(title: String, results: List<TrackSearch>): TrackSearch? {
+        val wanted = title.normalizedTitle()
+        return results.firstOrNull { it.title.normalizedTitle() == wanted }
+            ?: results.firstOrNull {
+                val candidate = it.title.normalizedTitle()
+                candidate.isNotEmpty() && (candidate.contains(wanted) || wanted.contains(candidate))
+            }
+            ?: results.firstOrNull()
+    }
+
+    private fun String.normalizedTitle() = lowercase().filter { it.isLetterOrDigit() }
 }

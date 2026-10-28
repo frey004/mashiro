@@ -54,6 +54,9 @@ class TrackPreferences(
 
     val autoUpdateTrack: Preference<Boolean> = preferenceStore.getBoolean("pref_auto_update_manga_sync_key", true)
 
+    /** Buscar y vincular el manga en los servicios con sesión iniciada al añadirlo a la biblioteca. */
+    val autoTrackOnLibraryAdd: Preference<Boolean> = preferenceStore.getBoolean("pref_auto_track_on_library_add", true)
+
     val autoUpdateTrackOnMarkRead: Preference<AutoTrackState> = preferenceStore.getEnum(
         "pref_auto_update_manga_on_mark_read",
         AutoTrackState.ALWAYS,

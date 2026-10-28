@@ -900,4 +900,10 @@
     <string name="pref_liquid_glass_transparency">Transparencia</string>
     <string name="action_previous_category">Categoría anterior</string>
     <string name="action_next_category">Categoría siguiente</string>
+    <string name="pref_auto_track_library_add">Seguir automáticamente al añadir a la biblioteca</string>
+    <string name="pref_auto_track_library_add_summary">Busca el manga por su título y lo vincula en los servicios con sesión iniciada (AniList, MyAnimeList…)</string>
+    <string name="action_auto_track_library">Vincular toda la biblioteca ahora</string>
+    <string name="action_auto_track_library_summary">Vincula los mangas que todavía no tienen seguimiento. Puede tardar unos minutos</string>
+    <string name="auto_track_library_started">Vinculando la biblioteca en segundo plano…</string>
+    <string name="auto_track_library_finished">Se vincularon %1$d mangas con los servicios de seguimiento</string>
 </resources>
