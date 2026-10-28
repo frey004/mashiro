@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,6 +19,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -65,26 +67,51 @@ fun MangaRecommendations(
     val context = LocalContext.current
     val client = remember { context.appGraph.networkHelper.client }
     val recommendations by produceState(initialValue = emptyList<MangaRecommendation>(), title) {
-        value = RecommendationsRepository.get(client, title)
+        value = AnilistDiscovery.recommendations(client, title)
     }
     if (recommendations.isEmpty()) return
 
+    CoverCarousel(
+        title = stringResource(MR.strings.manga_recommendations),
+        items = recommendations,
+        onClick = onRecommendationClick,
+        modifier = modifier,
+    )
+}
+
+/** Fila horizontal de portadas con título. */
+@Composable
+fun CoverCarousel(
+    title: String,
+    items: List<MangaRecommendation>,
+    onClick: (title: String) -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: @Composable () -> Unit = {},
+) {
     Column(modifier = modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(MR.strings.manga_recommendations),
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            trailing()
+        }
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(recommendations, key = { it.title }) { item ->
+            items(items, key = { it.title }) { item ->
                 Column(
                     modifier = Modifier
                         .width(110.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .clickable { onRecommendationClick(item.title) },
+                        .clickable { onClick(item.title) },
                 ) {
                     AsyncImage(
                         model = item.coverUrl,
@@ -108,14 +135,54 @@ fun MangaRecommendations(
     }
 }
 
-private object RecommendationsRepository {
+internal object AnilistDiscovery {
     private val cache = ConcurrentHashMap<String, List<MangaRecommendation>>()
+    private var trendingCache: List<MangaRecommendation>? = null
+
+    private const val TRENDING_QUERY = "{ Page(perPage: 20) { media(type: MANGA, sort: TRENDING_DESC, isAdult: false) { " +
+        "title { romaji english } coverImage { large } } } }"
+
+    /** Mangas en tendencia en AniList. */
+    suspend fun trending(client: OkHttpClient): List<MangaRecommendation> {
+        trendingCache?.let { return it }
+        return withContext(Dispatchers.IO) {
+            try {
+                val text = post(client, buildJsonObject { put("query", TRENDING_QUERY) }.toString())
+                val media = (Json.parseToJsonElement(text) as? JsonObject)
+                    ?.obj("data")
+                    ?.obj("Page")
+                    ?.get("media") as? JsonArray
+                    ?: return@withContext emptyList()
+                media.mapNotNull { (it as? JsonObject)?.toRecommendation() }
+                    .distinctBy { it.title }
+                    .also { trendingCache = it }
+            } catch (e: Exception) {
+                logcat(LogPriority.WARN, e) { "Could not load trending manga" }
+                emptyList()
+            }
+        }
+    }
+
+    private suspend fun post(client: OkHttpClient, json: String): String {
+        val request = Request.Builder()
+            .url("https://graphql.anilist.co")
+            .header("Accept", "application/json")
+            .post(json.toRequestBody("application/json".toMediaType()))
+            .build()
+        return client.newCall(request).awaitSuccess().use { it.body.string() }
+    }
+
+    private fun JsonObject.toRecommendation(): MangaRecommendation? {
+        val titles = obj("title")
+        val name = titles?.string("english") ?: titles?.string("romaji") ?: return null
+        return MangaRecommendation(title = name, coverUrl = obj("coverImage")?.string("large"))
+    }
 
     private const val QUERY = "query(\$search: String) { Media(search: \$search, type: MANGA) { " +
         "recommendations(sort: RATING_DESC, perPage: 20) { nodes { mediaRecommendation { " +
         "title { romaji english } coverImage { large } } } } } }"
 
-    suspend fun get(client: OkHttpClient, title: String): List<MangaRecommendation> {
+    suspend fun recommendations(client: OkHttpClient, title: String): List<MangaRecommendation> {
         if (title.isBlank()) return emptyList()
         cache[title]?.let { return it }
         return withContext(Dispatchers.IO) {
@@ -123,14 +190,8 @@ private object RecommendationsRepository {
                 val body = buildJsonObject {
                     put("query", QUERY)
                     putJsonObject("variables") { put("search", title) }
-                }.toString().toRequestBody("application/json".toMediaType())
-                val request = Request.Builder()
-                    .url("https://graphql.anilist.co")
-                    .header("Accept", "application/json")
-                    .post(body)
-                    .build()
-                val text = client.newCall(request).awaitSuccess().use { it.body.string() }
-                parse(text).also { cache[title] = it }
+                }.toString()
+                parse(post(client, body)).also { cache[title] = it }
             } catch (e: Exception) {
                 logcat(LogPriority.WARN, e) { "Could not load recommendations for $title" }
                 emptyList()
@@ -145,10 +206,7 @@ private object RecommendationsRepository {
             ?: return emptyList()
         val nodes = media.obj("recommendations")?.get("nodes") as? JsonArray ?: return emptyList()
         return nodes.mapNotNull { node ->
-            val rec = (node as? JsonObject)?.obj("mediaRecommendation") ?: return@mapNotNull null
-            val titles = rec.obj("title")
-            val name = titles?.string("english") ?: titles?.string("romaji") ?: return@mapNotNull null
-            MangaRecommendation(title = name, coverUrl = rec.obj("coverImage")?.string("large"))
+            (node as? JsonObject)?.obj("mediaRecommendation")?.toRecommendation()
         }
             .distinctBy { it.title }
     }

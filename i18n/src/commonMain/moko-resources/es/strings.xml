@@ -908,4 +908,6 @@
     <string name="auto_track_library_finished">Se vincularon %1$d mangas con los servicios de seguimiento</string>
     <string name="manga_read_progress">Leídos %1$d de %2$d capítulos</string>
     <string name="manga_recommendations">Recomendaciones</string>
+    <string name="browse_suggestions">Sugerencias</string>
+    <string name="browse_manage_extensions">Gestionar</string>
 </resources>

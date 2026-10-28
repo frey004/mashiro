@@ -1108,4 +1108,6 @@
     <string name="auto_track_library_finished">Linked %1$d manga with tracking services</string>
     <string name="manga_read_progress">Read %1$d of %2$d chapters</string>
     <string name="manga_recommendations">Recommendations</string>
+    <string name="browse_suggestions">Suggestions</string>
+    <string name="browse_manage_extensions">Manage</string>
 </resources>

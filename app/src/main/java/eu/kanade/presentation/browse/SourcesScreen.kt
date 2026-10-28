@@ -1,6 +1,33 @@
 package eu.kanade.presentation.browse
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import eu.kanade.presentation.browse.components.SourceIcon
+import eu.kanade.presentation.manga.components.AnilistDiscovery
+import eu.kanade.presentation.manga.components.CoverCarousel
+import eu.kanade.presentation.manga.components.MangaRecommendation
+import mihon.app.di.appGraph
+import mihon.icons.materialsymbols.rounded.Download
+import mihon.icons.materialsymbols.rounded.Folder
+import mihon.icons.materialsymbols.rounded.TravelExplore
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -45,6 +72,11 @@ fun SourcesScreen(
     onClickItem: (Source, Listing) -> Unit,
     onClickPin: (Source) -> Unit,
     onLongClickItem: (Source) -> Unit,
+    onClickLocal: () -> Unit,
+    onClickGlobalSearch: () -> Unit,
+    onClickDownloads: () -> Unit,
+    onClickManageExtensions: () -> Unit,
+    onClickSuggestion: (title: String) -> Unit,
 ) {
     when {
         state.isLoading -> LoadingScreen(Modifier.padding(contentPadding))
@@ -53,42 +85,178 @@ fun SourcesScreen(
             modifier = Modifier.padding(contentPadding),
         )
         else -> {
-            ScrollbarLazyColumn(
-                contentPadding = contentPadding + topSmallPaddingValues,
+            SourcesGrid(
+                state = state,
+                contentPadding = contentPadding,
+                onClickItem = onClickItem,
+                onLongClickItem = onLongClickItem,
+                onClickLocal = onClickLocal,
+                onClickGlobalSearch = onClickGlobalSearch,
+                onClickDownloads = onClickDownloads,
+                onClickManageExtensions = onClickManageExtensions,
+                onClickSuggestion = onClickSuggestion,
+            )
+        }
+    }
+}
+
+/**
+ * Explorar: accesos rápidos, sugerencias en tendencia y las fuentes como cuadrícula de iconos.
+ */
+@Composable
+private fun SourcesGrid(
+    state: SourcesViewModel.State,
+    contentPadding: PaddingValues,
+    onClickItem: (Source, Listing) -> Unit,
+    onLongClickItem: (Source) -> Unit,
+    onClickLocal: () -> Unit,
+    onClickGlobalSearch: () -> Unit,
+    onClickDownloads: () -> Unit,
+    onClickManageExtensions: () -> Unit,
+    onClickSuggestion: (title: String) -> Unit,
+) {
+    val context = LocalContext.current
+    val client = remember { context.appGraph.networkHelper.client }
+    val suggestions by produceState(initialValue = emptyList<MangaRecommendation>()) {
+        value = AnilistDiscovery.trending(client)
+    }
+    val sources = remember(state.items) {
+        state.items
+            .filterIsInstance<SourceUiModel.Item>()
+            .map { it.source }
+            .filterNot { it.isLocal() }
+            .distinctBy { it.id }
+    }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(4),
+        contentPadding = contentPadding + PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item(span = { GridItemSpan(maxLineSpan) }, key = "quick-actions") {
+            Row(
+                modifier = Modifier.padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(
-                    items = state.items,
-                    contentType = {
-                        when (it) {
-                            is SourceUiModel.Header -> "header"
-                            is SourceUiModel.Item -> "item"
-                        }
-                    },
-                    key = {
-                        when (it) {
-                            is SourceUiModel.Header -> it.hashCode()
-                            is SourceUiModel.Item -> "source-${it.source.key()}"
-                        }
-                    },
-                ) { model ->
-                    when (model) {
-                        is SourceUiModel.Header -> {
-                            SourceHeader(
-                                modifier = Modifier.animateItem(),
-                                language = model.language,
-                            )
-                        }
-                        is SourceUiModel.Item -> SourceItem(
-                            modifier = Modifier.animateItem(),
-                            source = model.source,
-                            onClickItem = onClickItem,
-                            onLongClickItem = onLongClickItem,
-                            onClickPin = onClickPin,
-                        )
-                    }
+                QuickTile(
+                    text = stringResource(MR.strings.local_source),
+                    icon = MaterialSymbols.Rounded.Folder,
+                    onClick = onClickLocal,
+                )
+                QuickTile(
+                    text = stringResource(MR.strings.action_global_search),
+                    icon = MaterialSymbols.Rounded.TravelExplore,
+                    onClick = onClickGlobalSearch,
+                )
+                QuickTile(
+                    text = stringResource(MR.strings.label_download_queue),
+                    icon = MaterialSymbols.Rounded.Download,
+                    onClick = onClickDownloads,
+                )
+            }
+        }
+
+        if (suggestions.isNotEmpty()) {
+            item(span = { GridItemSpan(maxLineSpan) }, key = "suggestions") {
+                CoverCarousel(
+                    title = stringResource(MR.strings.browse_suggestions),
+                    items = suggestions,
+                    onClick = onClickSuggestion,
+                )
+            }
+        }
+
+        item(span = { GridItemSpan(maxLineSpan) }, key = "extensions-header") {
+            Row(
+                modifier = Modifier.padding(start = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(MR.strings.label_sources),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onClickManageExtensions) {
+                    Text(stringResource(MR.strings.browse_manage_extensions))
                 }
             }
         }
+
+        items(sources, key = { "source-${it.key()}" }) { source ->
+            SourceGridItem(
+                source = source,
+                onClick = { onClickItem(source, Listing.Popular) },
+                onLongClick = { onLongClickItem(source) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RowScope.QuickTile(
+    text: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier
+            .weight(1f)
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick),
+    ) {
+        Column(
+            modifier = Modifier.padding(vertical = 14.dp, horizontal = 4.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Icon(imageVector = icon, contentDescription = null)
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SourceGridItem(
+    source: Source,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            SourceIcon(
+                source = source,
+                modifier = Modifier
+                    .padding(10.dp)
+                    .clip(RoundedCornerShape(14.dp)),
+            )
+        }
+        Text(
+            text = source.name,
+            style = MaterialTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 6.dp),
+        )
     }
 }
 
