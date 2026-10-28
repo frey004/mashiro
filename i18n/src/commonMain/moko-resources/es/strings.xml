@@ -675,7 +675,7 @@
     <string name="pref_chapter_swipe_end">Al deslizar a la derecha en un capítulo</string>
     <string name="pref_double_tap_zoom">Ampliar tocando dos veces la pantalla</string>
     <string name="action_sort_next_updated">Próxima actualización prevista</string>
-    <string name="pref_update_only_in_release_period">Intentar predecir cuándo sale el siguiente número</string>
+    <string name="pref_update_only_in_release_period">Saltarse títulos a los que aún no les toca capítulo nuevo</string>
     <string name="intervals_header">Intervalos</string>
     <string name="manga_display_interval_title">Estimar cada</string>
     <string name="manga_display_modified_interval_title">Forzar actualización cada</string>
@@ -749,7 +749,7 @@
     <string name="invalid_backup_file_error">Descripción completa del problema:</string>
     <string name="manga_interval_expected_update">Se espera que el siguiente número salga en aproximadamente %1$s, la aplicación busca actualizaciones cada %2$s.</string>
     <string name="manga_interval_custom_amount">Frecuencia de actualización personalizada:</string>
-    <string name="pref_library_update_smart_update">Actualizaciones inteligentes</string>
+    <string name="pref_library_update_smart_update">Omitir actualización de entradas</string>
     <string name="onboarding_storage_help_info">¿Acabas de actualizar desde una versión más antigua y no sabes qué hacer? Échale un vistazo a la guía de almacenamiento.</string>
     <string name="onboarding_storage_help_action">Guía de almacenamiento</string>
     <string name="theme_nord">Norteño</string>
@@ -916,4 +916,5 @@
     <string name="theme_liquid_glass">Liquid glass</string>
     <string name="pref_liquid_glass_color">Color del cristal</string>
     <string name="browse_popular_in">Populares en %1$s</string>
+    <string name="pref_library_update_smart_update_summary">Solo se aplica a las actualizaciones automáticas. Al actualizar a mano se revisan todas las entradas</string>
 </resources>

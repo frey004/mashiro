@@ -200,6 +200,7 @@ object SettingsLibraryScreen : SearchableSettings {
                         MANGA_OUTSIDE_RELEASE_PERIOD to stringResource(MR.strings.pref_update_only_in_release_period),
                     ),
                     title = stringResource(MR.strings.pref_library_update_smart_update),
+                    subtitle = stringResource(MR.strings.pref_library_update_smart_update_summary),
                 ),
                 Preference.PreferenceItem.SwitchPreference(
                     preference = libraryPreferences.newShowUpdatesCount,
