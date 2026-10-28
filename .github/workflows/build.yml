@@ -42,10 +42,10 @@ jobs:
           echo "MIHON_GITHUB_RELEASE=true" >> "$GITHUB_ENV"
           echo "storeFile=$RUNNER_TEMP/signing.jks" >> "$GITHUB_ENV"
 
-      # Sin telemetría ni actualizador. Isolated Projects desactivado en CI: a veces bloquea
+      # Sin telemetría; el actualizador busca las releases de este repositorio. Isolated Projects desactivado en CI: a veces bloquea
       # la configuración de Gradle justo después de :build-logic:jar en los runners de GitHub
       - name: Build app
-        run: ./gradlew assembleRelease -Pinclude-telemetry=false -Penable-updater=false -Dorg.gradle.isolated-projects=false --no-configuration-cache
+        run: ./gradlew assembleRelease -Pinclude-telemetry=false -Penable-updater=true -PbuildNumber=${{ github.run_number }} -Dorg.gradle.isolated-projects=false --no-configuration-cache
         env:
           keyAlias: ${{ secrets.KEY_ALIAS }}
           storePassword: ${{ secrets.KEY_STORE_PASSWORD }}

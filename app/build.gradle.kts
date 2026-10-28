@@ -42,6 +42,8 @@ android {
 
         buildConfigField("boolean", "TELEMETRY_INCLUDED", "${Config.includeTelemetry}")
         buildConfigField("boolean", "UPDATER_ENABLED", "${Config.enableUpdater}")
+        // Número de compilación de GitHub Actions; se compara con la etiqueta vX.Y.Z-rN de las releases
+        buildConfigField("int", "BUILD_NUMBER", (project.findProperty("buildNumber") ?: "0").toString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

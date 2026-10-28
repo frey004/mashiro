@@ -30,6 +30,11 @@ class GetApplicationRelease(
         versionName: String,
         versionTag: String,
     ): Boolean {
+        // Releases de ましろ: etiquetas "v0.21.3-r16", donde 16 es el número de compilación
+        BUILD_TAG_REGEX.find(versionTag)?.let { match ->
+            return match.groupValues[1].toInt() > commitCount
+        }
+
         // Removes prefixes like "r" or "v"
         val newVersion = versionTag.replace("[^\\d.]".toRegex(), "")
         return if (isNightly) {
@@ -52,6 +57,10 @@ class GetApplicationRelease(
 
             false
         }
+    }
+
+    private companion object {
+        val BUILD_TAG_REGEX = "-r(\\d+)$".toRegex()
     }
 
     data class Arguments(
