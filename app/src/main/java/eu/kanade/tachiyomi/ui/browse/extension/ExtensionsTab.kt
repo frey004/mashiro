@@ -96,11 +96,11 @@ fun extensionsTab(
                 onRefresh = extensionsViewModel::findAvailableExtensions,
                 // "Ocultar" desactiva todas las fuentes de la extensión en Explorar
                 isExtensionHidden = { extension ->
-                    val ids = (extension as? Extension.Installed)?.sources?.map { it.id.toString() }.orEmpty()
+                    val ids = (extension as? Extension.Loaded)?.sources?.map { it.id.toString() }.orEmpty()
                     ids.isNotEmpty() && ids.all { it in disabledSources }
                 },
                 onToggleExtensionHidden = { extension ->
-                    val ids = (extension as? Extension.Installed)?.sources?.map { it.id.toString() }.orEmpty()
+                    val ids = (extension as? Extension.Loaded)?.sources?.map { it.id.toString() }.orEmpty()
                     if (ids.isNotEmpty()) {
                         val hidden = ids.all { it in disabledSources }
                         sourcePreferences.disabledSources.set(
