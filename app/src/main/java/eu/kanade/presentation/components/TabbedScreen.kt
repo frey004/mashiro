@@ -34,6 +34,7 @@ fun TabbedScreen(
     state: PagerState = rememberPagerState { tabs.size },
     searchQuery: String? = null,
     onChangeSearchQuery: (String?) -> Unit = {},
+    navigateUp: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -45,6 +46,7 @@ fun TabbedScreen(
 
             SearchToolbar(
                 titleContent = { AppBarTitle(stringResource(titleRes)) },
+                navigateUp = navigateUp,
                 searchEnabled = searchEnabled,
                 searchQuery = if (searchEnabled) searchQuery else null,
                 onChangeSearchQuery = onChangeSearchQuery,
@@ -60,17 +62,20 @@ fun TabbedScreen(
                 end = contentPadding.calculateEndPadding(LocalLayoutDirection.current),
             ),
         ) {
-            PrimaryTabRow(
-                selectedTabIndex = state.currentPage,
-                modifier = Modifier.zIndex(1f),
-            ) {
-                tabs.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = state.currentPage == index,
-                        onClick = { scope.launch { state.animateScrollToPage(index) } },
-                        text = { TabText(text = stringResource(tab.titleRes), badgeCount = tab.badgeNumber) },
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurface,
-                    )
+            // Con una sola pestaña no se muestra la fila de pestañas
+            if (tabs.size > 1) {
+                PrimaryTabRow(
+                    selectedTabIndex = state.currentPage,
+                    modifier = Modifier.zIndex(1f),
+                ) {
+                    tabs.forEachIndexed { index, tab ->
+                        Tab(
+                            selected = state.currentPage == index,
+                            onClick = { scope.launch { state.animateScrollToPage(index) } },
+                            text = { TabText(text = stringResource(tab.titleRes), badgeCount = tab.badgeNumber) },
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
                 }
             }
 

@@ -21,6 +21,8 @@ import eu.kanade.tachiyomi.extension.model.Extension
 import eu.kanade.tachiyomi.ui.browse.extension.details.ExtensionDetailsScreen
 import eu.kanade.tachiyomi.ui.webview.WebViewScreen
 import eu.kanade.tachiyomi.util.system.isPackageInstalled
+import mihon.app.di.appGraph
+import tachiyomi.presentation.core.util.collectAsState
 import tachiyomi.i18n.MR
 import tachiyomi.presentation.core.i18n.stringResource
 
@@ -33,6 +35,8 @@ fun extensionsTab(
 
     val updatesCount by extensionsViewModel.updatesCount.collectAsStateWithLifecycle()
     var privateExtensionToUninstall by remember { mutableStateOf<Extension.Installed?>(null) }
+    val sourcePreferences = remember { context.appGraph.sourcePreferences }
+    val disabledSources by sourcePreferences.disabledSources.collectAsState()
 
     return TabContent(
         titleRes = MR.strings.label_extensions,
@@ -90,6 +94,20 @@ fun extensionsTab(
                 onUninstallExtension = { extensionsViewModel.uninstallExtension(it) },
                 onUpdateExtension = extensionsViewModel::updateExtension,
                 onRefresh = extensionsViewModel::findAvailableExtensions,
+                // "Ocultar" desactiva todas las fuentes de la extensión en Explorar
+                isExtensionHidden = { extension ->
+                    val ids = (extension as? Extension.Installed)?.sources?.map { it.id.toString() }.orEmpty()
+                    ids.isNotEmpty() && ids.all { it in disabledSources }
+                },
+                onToggleExtensionHidden = { extension ->
+                    val ids = (extension as? Extension.Installed)?.sources?.map { it.id.toString() }.orEmpty()
+                    if (ids.isNotEmpty()) {
+                        val hidden = ids.all { it in disabledSources }
+                        sourcePreferences.disabledSources.set(
+                            if (hidden) disabledSources - ids.toSet() else disabledSources + ids,
+                        )
+                    }
+                },
             )
 
             privateExtensionToUninstall?.let { extension ->

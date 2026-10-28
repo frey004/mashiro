@@ -910,4 +910,7 @@
     <string name="manga_recommendations">Recomendaciones</string>
     <string name="browse_suggestions">Sugerencias</string>
     <string name="browse_manage_extensions">Gestionar</string>
+    <string name="browse_search_manga">Buscar manga</string>
+    <string name="ext_hide_sources">Ocultar fuentes</string>
+    <string name="ext_show_sources">Mostrar fuentes</string>
 </resources>

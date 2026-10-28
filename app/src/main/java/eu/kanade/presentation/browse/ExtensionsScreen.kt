@@ -24,6 +24,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import mihon.icons.materialsymbols.rounded.Block
+import mihon.icons.materialsymbols.rounded.Preview
+import mihon.icons.materialsymbols.rounded.Delete
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,6 +95,8 @@ fun ExtensionScreen(
     onOpenExtension: (Extension.Loaded) -> Unit,
     onClickUpdateAll: () -> Unit,
     onRefresh: () -> Unit,
+    isExtensionHidden: (Extension) -> Boolean = { false },
+    onToggleExtensionHidden: (Extension) -> Unit = {},
 ) {
     val navigator = LocalNavigator.currentOrThrow
 
@@ -130,6 +138,8 @@ fun ExtensionScreen(
                     onTrustExtension = onTrustExtension,
                     onOpenExtension = onOpenExtension,
                     onClickUpdateAll = onClickUpdateAll,
+                    isExtensionHidden = isExtensionHidden,
+                    onToggleExtensionHidden = onToggleExtensionHidden,
                 )
             }
         }
@@ -149,6 +159,8 @@ private fun ExtensionContent(
     onTrustExtension: (Extension.NotLoaded) -> Unit,
     onOpenExtension: (Extension.Loaded) -> Unit,
     onClickUpdateAll: () -> Unit,
+    isExtensionHidden: (Extension) -> Boolean,
+    onToggleExtensionHidden: (Extension) -> Unit,
 ) {
     val context = LocalContext.current
     var notLoadedState by remember { mutableStateOf<Extension.NotLoaded?>(null) }
@@ -219,6 +231,8 @@ private fun ExtensionContent(
                 ExtensionItem(
                     modifier = Modifier.animateItem(),
                     item = item,
+                    isHidden = isExtensionHidden(item.extension),
+                    onToggleHidden = onToggleExtensionHidden,
                     onClickItem = {
                         when (it) {
                             is Extension.Available -> onInstallExtension(it)
@@ -292,6 +306,8 @@ private fun ExtensionContent(
 @Composable
 private fun ExtensionItem(
     item: ExtensionUiModel.Item,
+    isHidden: Boolean,
+    onToggleHidden: (Extension) -> Unit,
     onClickItem: (Extension) -> Unit,
     onLongClickItem: (Extension) -> Unit,
     onClickItemCancel: (Extension) -> Unit,
@@ -316,9 +332,12 @@ private fun ExtensionItem(
             ExtensionItemActions(
                 extension = extension,
                 installStep = installStep,
+                isHidden = isHidden,
                 onClickItemCancel = onClickItemCancel,
                 onClickItemAction = onClickItemAction,
                 onClickItemSecondaryAction = onClickItemSecondaryAction,
+                onToggleHidden = onToggleHidden,
+                onUninstall = onLongClickItem,
             )
         },
     ) {
@@ -456,9 +475,12 @@ private fun ExtensionItemActions(
     extension: Extension,
     installStep: InstallStep,
     modifier: Modifier = Modifier,
+    isHidden: Boolean = false,
     onClickItemCancel: (Extension) -> Unit = {},
     onClickItemAction: (Extension) -> Unit = {},
     onClickItemSecondaryAction: (Extension) -> Unit = {},
+    onToggleHidden: (Extension) -> Unit = {},
+    onUninstall: (Extension) -> Unit = {},
 ) {
     Row(
         modifier = modifier,
@@ -472,6 +494,26 @@ private fun ExtensionItemActions(
                     contentDescription = stringResource(MR.strings.action_cancel),
                 )
             }
+            return@Row
+        }
+
+        // Extensión instalada y al día: ocultar/mostrar sus fuentes, ajustes y desinstalar
+        if (extension is Extension.Loaded && !extension.hasUpdate && installStep != InstallStep.Error) {
+            ManageButton(
+                icon = if (isHidden) MaterialSymbols.Rounded.Block else MaterialSymbols.Rounded.Preview,
+                label = stringResource(if (isHidden) MR.strings.ext_show_sources else MR.strings.ext_hide_sources),
+                onClick = { onToggleHidden(extension) },
+            )
+            ManageButton(
+                icon = MaterialSymbols.Rounded.Settings,
+                label = stringResource(MR.strings.action_settings),
+                onClick = { onClickItemSecondaryAction(extension) },
+            )
+            ManageButton(
+                icon = MaterialSymbols.Rounded.Delete,
+                label = stringResource(MR.strings.ext_uninstall),
+                onClick = { onUninstall(extension) },
+            )
             return@Row
         }
 
@@ -645,4 +687,18 @@ private fun ExtensionTrustDialog(
         },
         onDismissRequest = onDismissRequest,
     )
+}
+
+@Composable
+private fun ManageButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+) {
+    FilledTonalIconButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Icon(imageVector = icon, contentDescription = label)
+    }
 }
