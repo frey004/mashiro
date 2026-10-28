@@ -17,74 +17,119 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
+import kotlin.math.sin
 
 private val InkShape = RoundedCornerShape(28.dp)
-private val InkColor = Color(0xFF0D0D12)
+private val InkColor = Color(0xFF0B0B10)
+
+private val RootLight = Color(0xFFFFE27A)
+private val RootMid = Color(0xFFE2B541)
+private val RootDark = Color(0xFF8C6418)
+private val RootOutline = Color(0xFF2B1D07)
 
 /**
- * Superficie flotante "de tinta" para las barras del lector: fondo negro tinta translúcido con
- * raíces finas que crecen desde el borde, teñidas con el color del tema.
+ * Superficie flotante "de tinta" para las barras del lector: fondo negro tinta translúcido atravesado
+ * por raíces gruesas y doradas que se retuercen y entrelazan a lo largo de la barra.
  *
- * @param rootsFromTop si las raíces nacen del borde superior (barra de abajo) o del inferior (barra de arriba).
+ * @param seed cambia la forma de las raíces para que cada barra sea distinta.
  */
 @Composable
 fun InkSurface(
     modifier: Modifier = Modifier,
-    rootsFromTop: Boolean = false,
+    seed: Int = 0,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val veinColor = MaterialTheme.colorScheme.primary
+    // Texto e iconos claros sobre el fondo oscuro
+    val colorScheme = MaterialTheme.colorScheme.copy(
+        onSurface = Color.White,
+        onSurfaceVariant = Color.White.copy(alpha = 0.8f),
+        onBackground = Color.White,
+    )
     Box(
         modifier = modifier
             .clip(InkShape)
+            .background(InkColor.copy(alpha = 0.88f))
+            .drawBehind { drawIntertwinedRoots(seed) }
             .background(
+                // Velo para que las raíces no compitan con los iconos
                 Brush.verticalGradient(
-                    listOf(InkColor.copy(alpha = 0.92f), InkColor.copy(alpha = 0.80f)),
+                    listOf(InkColor.copy(alpha = 0.35f), InkColor.copy(alpha = 0.10f), InkColor.copy(alpha = 0.35f)),
                 ),
             )
-            .drawBehind { drawInkRoots(veinColor, rootsFromTop) }
-            .border(1.dp, Color.White.copy(alpha = 0.12f), InkShape),
+            .border(1.dp, RootMid.copy(alpha = 0.35f), InkShape),
     ) {
-        CompositionLocalProvider(LocalContentColor provides Color.White) {
-            content()
+        MaterialTheme(colorScheme = colorScheme) {
+            CompositionLocalProvider(LocalContentColor provides Color.White) {
+                content()
+            }
         }
     }
 }
 
-/** Dibuja ramas finas que se abren desde un borde, como tinta que se extiende sobre papel. */
-private fun DrawScope.drawInkRoots(color: Color, fromTop: Boolean) {
+/**
+ * Varias hebras que recorren la barra de lado a lado ondulando con fases distintas, de modo que se
+ * cruzan como raíces trenzadas. Cada hebra tiene grosor variable, relleno dorado con degradado,
+ * contorno oscuro, una veta clara en el centro y un halo suave.
+ */
+private fun DrawScope.drawIntertwinedRoots(seed: Int) {
     val w = size.width
     val h = size.height
-    val baseY = if (fromTop) 0f else h
-    val dir = if (fromTop) 1f else -1f
-    // Puntos de nacimiento repartidos a lo ancho; cada raíz se curva y se ramifica una vez
-    val seeds = listOf(0.08f, 0.27f, 0.51f, 0.73f, 0.92f)
-    seeds.forEachIndexed { i, fx ->
-        val startX = w * fx
-        val sway = if (i % 2 == 0) 1f else -1f
-        val length = h * (0.55f + 0.1f * (i % 3))
-        val main = Path().apply {
-            moveTo(startX, baseY)
-            cubicTo(
-                startX + sway * w * 0.03f, baseY + dir * length * 0.35f,
-                startX - sway * w * 0.04f, baseY + dir * length * 0.65f,
-                startX + sway * w * 0.05f, baseY + dir * length,
-            )
+    if (w <= 0f || h <= 0f) return
+    val strands = 5
+    val steps = 48
+    for (k in 0 until strands) {
+        val phase = (k * 1.3f + seed * 0.7f) * PI.toFloat()
+        val waves = 1.2f + 0.25f * ((k + seed) % 3)
+        val amplitude = h * (0.22f + 0.05f * (k % 2))
+        val baseThickness = h * (0.10f + 0.03f * ((k + 1) % 3))
+        val center = h / 2f + h * 0.06f * (k - strands / 2f) / strands
+
+        val top = ArrayList<Offset>(steps + 1)
+        val bottom = ArrayList<Offset>(steps + 1)
+        val spine = Path()
+        for (i in 0..steps) {
+            val t = i / steps.toFloat()
+            val x = -w * 0.05f + t * w * 1.1f
+            val angle = t * waves * 2f * PI.toFloat() + phase
+            val y = center + amplitude * sin(angle)
+            // Más gruesa en el centro de cada onda, más fina donde se cruza
+            val thickness = baseThickness * (0.55f + 0.45f * kotlin.math.abs(sin(angle * 0.5f + k)))
+            top += Offset(x, y - thickness / 2f)
+            bottom += Offset(x, y + thickness / 2f)
+            if (i == 0) spine.moveTo(x, y) else spine.lineTo(x, y)
         }
-        drawPath(main, color.copy(alpha = 0.30f), style = Stroke(width = 2.2f, cap = StrokeCap.Round))
-        val branch = Path().apply {
-            val bx = startX + sway * w * 0.01f
-            val by = baseY + dir * length * 0.4f
-            moveTo(bx, by)
-            quadraticTo(
-                bx + sway * w * 0.05f, by + dir * length * 0.15f,
-                bx + sway * w * 0.08f, by + dir * length * 0.35f,
-            )
+        val body = Path().apply {
+            moveTo(top.first().x, top.first().y)
+            top.drop(1).forEach { lineTo(it.x, it.y) }
+            bottom.asReversed().forEach { lineTo(it.x, it.y) }
+            close()
         }
-        drawPath(branch, color.copy(alpha = 0.20f), style = Stroke(width = 1.2f, cap = StrokeCap.Round))
-        drawCircle(color.copy(alpha = 0.25f), radius = 2.5f, center = Offset(startX, baseY + dir * 1.5f))
+        // Halo
+        drawPath(spine, RootLight.copy(alpha = 0.10f), style = Stroke(width = baseThickness * 2.2f, cap = StrokeCap.Round))
+        // Relleno dorado
+        drawPath(
+            body,
+            Brush.verticalGradient(
+                listOf(RootLight, RootMid, RootDark),
+                startY = center - amplitude - baseThickness,
+                endY = center + amplitude + baseThickness,
+            ),
+            alpha = 0.55f,
+        )
+        // Contorno oscuro estilo tinta
+        drawPath(body, RootOutline.copy(alpha = 0.85f), style = Stroke(width = 1.6f, join = StrokeJoin.Round))
+        // Veta clara en el centro
+        drawPath(spine, RootLight.copy(alpha = 0.45f), style = Stroke(width = 1.2f, cap = StrokeCap.Round))
+    }
+    // Chispas doradas sueltas
+    for (i in 0 until 10) {
+        val fx = ((i * 37 + seed * 13) % 100) / 100f
+        val fy = ((i * 61 + seed * 7) % 100) / 100f
+        drawCircle(RootLight.copy(alpha = 0.45f), radius = 1.6f + (i % 3), center = Offset(w * fx, h * fy))
     }
 }

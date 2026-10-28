@@ -92,7 +92,7 @@ fun ReaderAppBars(
                 modifier = Modifier
                     .windowInsetsPadding(WindowInsets.statusBars)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                rootsFromTop = false,
+                seed = 1,
             ) {
             ReaderTopBar(
                 modifier = Modifier
@@ -174,7 +174,7 @@ fun ReaderAppBars(
                     modifier = Modifier
                         .windowInsetsPadding(WindowInsets.navigationBars)
                         .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
-                    rootsFromTop = true,
+                    seed = 2,
                 ) {
                 ReaderBottomBar(
                     modifier = Modifier
