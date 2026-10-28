@@ -1,6 +1,13 @@
 package eu.kanade.presentation.library.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.material3.Text
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,12 +38,21 @@ internal fun DownloadsBadge(count: Int) {
 @Composable
 internal fun UnreadBadge(count: Long) {
     if (count > 0) {
-        Badge(
+        // Más pequeño que las demás insignias para no tapar la portada
+        Text(
             text = if (count > 99) "99+" else "$count",
-            color = MaterialTheme.colorScheme.error,
-            textColor = MaterialTheme.colorScheme.onError,
-            shape = CircleShape,
-            modifier = Modifier.padding(horizontal = 2.dp),
+            modifier = Modifier
+                .padding(horizontal = 2.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.error)
+                .defaultMinSize(minWidth = 15.dp)
+                .padding(horizontal = 3.dp),
+            color = MaterialTheme.colorScheme.onError,
+            fontSize = 9.sp,
+            lineHeight = 15.sp,
+            fontWeight = FontWeight.Medium,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
         )
     }
 }

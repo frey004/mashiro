@@ -15,7 +15,6 @@ import dev.zacsweers.metro.binding
 import dev.zacsweers.metrox.viewmodel.ViewModelKey
 import eu.kanade.core.preference.asState
 import eu.kanade.core.util.addOrRemove
-import eu.kanade.core.util.insertSeparators
 import eu.kanade.domain.chapter.interactor.SetReadStatus
 import eu.kanade.presentation.manga.components.ChapterDownloadAction
 import eu.kanade.presentation.updates.UpdatesUiModel
@@ -505,17 +504,16 @@ class UpdatesViewModel(
         val selected = items.filter { it.selected }
         val selectionMode = selected.isNotEmpty()
 
+        /** Agrupa por día y, dentro de cada día, junta los capítulos de un mismo manga. */
         fun getUiModel(): List<UpdatesUiModel> {
             return items
-                .map { UpdatesUiModel.Item(it) }
-                .insertSeparators { before, after ->
-                    val beforeDate = before?.item?.update?.dateFetch?.toLocalDate()
-                    val afterDate = after?.item?.update?.dateFetch?.toLocalDate()
-                    when {
-                        beforeDate != afterDate && afterDate != null -> UpdatesUiModel.Header(afterDate)
-                        // Return null to avoid adding a separator between two items.
-                        else -> null
+                .groupBy { it.update.dateFetch.toLocalDate() }
+                .flatMap { (date, dayItems) ->
+                    val rows = dayItems.groupBy { it.update.mangaId }.values.map { mangaItems ->
+                        mangaItems.singleOrNull()?.let { UpdatesUiModel.Item(it) }
+                            ?: UpdatesUiModel.Group(date, mangaItems)
                     }
+                    listOf(UpdatesUiModel.Header(date)) + rows
                 }
         }
     }

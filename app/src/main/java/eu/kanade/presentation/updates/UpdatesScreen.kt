@@ -12,6 +12,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -69,6 +70,7 @@ fun UpdateScreen(
     }
 
     val scope = rememberCoroutineScope()
+    val expandedGroups = remember { mutableStateListOf<String>() }
 
     Scaffold(
         topBar = { scrollBehavior ->
@@ -138,6 +140,10 @@ fun UpdateScreen(
 
                             updatesUiItems(
                                 uiModels = state.getUiModel(),
+                                expandedGroups = expandedGroups,
+                                onToggleGroup = { key ->
+                                    if (!expandedGroups.remove(key)) expandedGroups.add(key)
+                                },
                                 selectionMode = state.selectionMode,
                                 onUpdateSelected = onUpdateSelected,
                                 onClickCover = onClickCover,
@@ -250,4 +256,9 @@ private fun UpdatesBottomBar(
 sealed interface UpdatesUiModel {
     data class Header(val date: LocalDate) : UpdatesUiModel
     data class Item(val item: UpdatesItem) : UpdatesUiModel
+
+    /** Varios capítulos de un mismo manga actualizados el mismo día. */
+    data class Group(val date: LocalDate, val items: List<UpdatesItem>) : UpdatesUiModel {
+        val key = "updatesGroup-${items.first().update.mangaId}-$date"
+    }
 }

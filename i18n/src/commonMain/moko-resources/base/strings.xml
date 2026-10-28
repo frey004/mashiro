@@ -884,6 +884,7 @@
     <string name="updating_library">Updating library</string>
     <string name="update_already_running">An update is already running</string>
     <string name="cant_open_last_read_chapter">Unable to open last read chapter</string>
+    <string name="updates_group_chapters">%1$d new chapters</string>
     <string name="updates_last_update_info">Library last updated: %s</string>
     <string name="updates_last_update_info_just_now">Just now</string>
     <string name="relative_time_span_never">Never</string>

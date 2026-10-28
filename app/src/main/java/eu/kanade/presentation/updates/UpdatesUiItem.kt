@@ -1,6 +1,11 @@
 package eu.kanade.presentation.updates
 
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.util.fastAll
+import mihon.icons.materialsymbols.rounded.KeyboardArrowDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -77,38 +82,95 @@ internal fun UpdatesLastUpdatedHeader(
 
 internal fun LazyListScope.updatesUiItems(
     uiModels: List<UpdatesUiModel>,
+    expandedGroups: List<String>,
+    onToggleGroup: (String) -> Unit,
     selectionMode: Boolean,
     onUpdateSelected: (UpdatesItem, Boolean, Boolean) -> Unit,
     onClickCover: (UpdatesItem) -> Unit,
     onClickUpdate: (UpdatesItem) -> Unit,
     onDownloadChapter: (List<UpdatesItem>, ChapterDownloadAction) -> Unit,
 ) {
+    // Los grupos abiertos muestran sus capítulos justo debajo, con sangría
+    val rows = uiModels.flatMap { model ->
+        if (model is UpdatesUiModel.Group && model.key in expandedGroups) {
+            listOf(model) + model.items.map { UpdatesRow.Child(it) }
+        } else {
+            listOf(model)
+        }
+    }
     items(
-        items = uiModels,
+        items = rows,
         contentType = {
             when (it) {
                 is UpdatesUiModel.Header -> "header"
-                is UpdatesUiModel.Item -> "item"
+                is UpdatesUiModel.Item, is UpdatesRow.Child -> "item"
+                is UpdatesUiModel.Group -> "group"
+                else -> null
             }
         },
         key = {
             when (it) {
                 is UpdatesUiModel.Header -> "updatesHeader-${it.hashCode()}"
                 is UpdatesUiModel.Item -> "updates-${it.item.update.mangaId}-${it.item.update.chapterId}"
+                is UpdatesRow.Child -> "updates-${it.item.update.mangaId}-${it.item.update.chapterId}"
+                is UpdatesUiModel.Group -> it.key
+                else -> it.hashCode()
             }
         },
-    ) { item ->
-        when (item) {
+    ) { row ->
+        when (row) {
             is UpdatesUiModel.Header -> {
                 ListGroupHeader(
                     modifier = Modifier.animateItem(),
-                    text = relativeDateText(item.date),
+                    text = relativeDateText(row.date),
                 )
             }
-            is UpdatesUiModel.Item -> {
-                val updatesItem = item.item
+            is UpdatesUiModel.Group -> {
+                val items = row.items
+                UpdatesGroupItem(
+                    modifier = Modifier.animateItem(),
+                    items = items,
+                    expanded = row.key in expandedGroups,
+                    onClick = {
+                        if (selectionMode) {
+                            val select = !items.fastAll { it.selected }
+                            items.forEach { onUpdateSelected(it, select, false) }
+                        } else {
+                            onToggleGroup(row.key)
+                        }
+                    },
+                    onLongClick = {
+                        val select = !items.fastAll { it.selected }
+                        items.forEach { onUpdateSelected(it, select, false) }
+                    },
+                    onClickCover = { onClickCover(items.first()) }.takeIf { !selectionMode },
+                    onDownloadChapter = { action: ChapterDownloadAction ->
+                        when (action) {
+                            ChapterDownloadAction.START -> onDownloadChapter(
+                                items.filter { it.downloadStateProvider() != Download.State.DOWNLOADED },
+                                action,
+                            )
+                            ChapterDownloadAction.DELETE -> onDownloadChapter(
+                                items.filter { it.downloadStateProvider() == Download.State.DOWNLOADED },
+                                action,
+                            )
+                            // Cancelar y "descargar ya" van capítulo a capítulo
+                            ChapterDownloadAction.CANCEL, ChapterDownloadAction.START_NOW -> items
+                                .filter {
+                                    it.downloadStateProvider() == Download.State.QUEUE ||
+                                        it.downloadStateProvider() == Download.State.DOWNLOADING
+                                }
+                                .forEach { onDownloadChapter(listOf(it), action) }
+                        }
+                    }.takeIf { !selectionMode },
+                )
+            }
+            is UpdatesUiModel.Item, is UpdatesRow.Child -> {
+                val nested = row is UpdatesRow.Child
+                val updatesItem = if (row is UpdatesRow.Child) row.item else (row as UpdatesUiModel.Item).item
                 UpdatesUiItem(
                     modifier = Modifier.animateItem(),
+                    nested = nested,
                     update = updatesItem.update,
                     selected = updatesItem.selected,
                     readProgress = updatesItem.update.lastPageRead
@@ -140,26 +202,30 @@ internal fun LazyListScope.updatesUiItems(
     }
 }
 
+private sealed interface UpdatesRow {
+    /** Capítulo de un grupo desplegado. */
+    data class Child(val item: UpdatesItem) : UpdatesRow
+}
+
 @Composable
-private fun UpdatesUiItem(
-    update: UpdatesWithRelations,
-    selected: Boolean,
-    readProgress: String?,
+private fun UpdatesGroupItem(
+    items: List<UpdatesItem>,
+    expanded: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onClickCover: (() -> Unit)?,
     onDownloadChapter: ((ChapterDownloadAction) -> Unit)?,
-    // Download Indicator
-    downloadStateProvider: () -> Download.State,
-    downloadProgressProvider: () -> Int,
     modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
-    val textAlpha = if (update.read) DISABLED_ALPHA else 1f
+    val update = items.first().update
+    val unreadCount = items.count { !it.update.read }
+    val textAlpha = if (unreadCount == 0) DISABLED_ALPHA else 1f
+    val arrowRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "groupArrow")
 
     Row(
         modifier = modifier
-            .selectedBackground(selected)
+            .selectedBackground(items.fastAll { it.selected })
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = {
@@ -191,6 +257,123 @@ private fun UpdatesUiItem(
                 color = LocalContentColor.current.copy(alpha = textAlpha),
                 overflow = TextOverflow.Ellipsis,
             )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (unreadCount > 0) {
+                    Icon(
+                        imageVector = MaterialSymbols.RoundedFilled.Circle,
+                        contentDescription = stringResource(MR.strings.unread),
+                        modifier = Modifier
+                            .height(8.dp)
+                            .padding(end = 4.dp),
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                Text(
+                    text = stringResource(MR.strings.updates_group_chapters, items.size),
+                    maxLines = 1,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = LocalContentColor.current.copy(alpha = textAlpha),
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Icon(
+                    imageVector = MaterialSymbols.Rounded.KeyboardArrowDown,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .padding(start = 2.dp)
+                        .size(18.dp)
+                        .rotate(arrowRotation),
+                    tint = LocalContentColor.current.copy(alpha = textAlpha),
+                )
+            }
+        }
+
+        ChapterDownloadIndicator(
+            enabled = onDownloadChapter != null,
+            modifier = Modifier.padding(start = 4.dp),
+            downloadStateProvider = { groupDownloadState(items) },
+            downloadProgressProvider = {
+                items.filter { it.downloadStateProvider() == Download.State.DOWNLOADING }
+                    .map { it.downloadProgressProvider() }
+                    .takeIf { it.isNotEmpty() }
+                    ?.average()
+                    ?.toInt()
+                    ?: 0
+            },
+            onClick = { onDownloadChapter?.invoke(it) },
+        )
+    }
+}
+
+private fun groupDownloadState(items: List<UpdatesItem>): Download.State {
+    val states = items.map { it.downloadStateProvider() }
+    return when {
+        states.all { it == Download.State.DOWNLOADED } -> Download.State.DOWNLOADED
+        Download.State.DOWNLOADING in states -> Download.State.DOWNLOADING
+        Download.State.QUEUE in states -> Download.State.QUEUE
+        Download.State.ERROR in states -> Download.State.ERROR
+        else -> Download.State.NOT_DOWNLOADED
+    }
+}
+
+@Composable
+private fun UpdatesUiItem(
+    update: UpdatesWithRelations,
+    nested: Boolean,
+    selected: Boolean,
+    readProgress: String?,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    onClickCover: (() -> Unit)?,
+    onDownloadChapter: ((ChapterDownloadAction) -> Unit)?,
+    // Download Indicator
+    downloadStateProvider: () -> Download.State,
+    downloadProgressProvider: () -> Int,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val textAlpha = if (update.read) DISABLED_ALPHA else 1f
+
+    Row(
+        modifier = modifier
+            .selectedBackground(selected)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = {
+                    onLongClick()
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                },
+            )
+            .height(if (nested) 44.dp else 56.dp)
+            .padding(horizontal = MaterialTheme.padding.medium),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (nested) {
+            // Alineado bajo el título del grupo, sin repetir la portada
+            Spacer(modifier = Modifier.width(44.dp))
+        } else {
+            MangaCover.Square(
+                modifier = Modifier
+                    .padding(vertical = 6.dp)
+                    .fillMaxHeight(),
+                data = update.coverData,
+                onClick = onClickCover,
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .padding(horizontal = MaterialTheme.padding.medium)
+                .weight(1f),
+        ) {
+            if (!nested) {
+                Text(
+                    text = update.mangaTitle,
+                    maxLines = 1,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = LocalContentColor.current.copy(alpha = textAlpha),
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 var textHeight by remember { mutableIntStateOf(0) }
