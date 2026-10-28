@@ -906,4 +906,6 @@
     <string name="action_auto_track_library_summary">Vincula los mangas que todavía no tienen seguimiento. Puede tardar unos minutos</string>
     <string name="auto_track_library_started">Vinculando la biblioteca en segundo plano…</string>
     <string name="auto_track_library_finished">Se vincularon %1$d mangas con los servicios de seguimiento</string>
+    <string name="manga_read_progress">Leídos %1$d de %2$d capítulos</string>
+    <string name="manga_recommendations">Recomendaciones</string>
 </resources>

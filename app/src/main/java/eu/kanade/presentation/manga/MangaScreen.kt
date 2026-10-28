@@ -53,6 +53,11 @@ import eu.kanade.presentation.manga.components.MangaActionRow
 import eu.kanade.presentation.manga.components.MangaBottomActionMenu
 import eu.kanade.presentation.manga.components.MangaChapterListItem
 import eu.kanade.presentation.manga.components.MangaInfoBox
+import eu.kanade.presentation.manga.components.MangaDescriptionCard
+import eu.kanade.presentation.manga.components.MangaHeroHeader
+import eu.kanade.presentation.manga.components.MangaPrimaryActions
+import eu.kanade.presentation.manga.components.MangaProgressCard
+import eu.kanade.presentation.manga.components.MangaRecommendations
 import eu.kanade.presentation.manga.components.MangaToolbar
 import eu.kanade.presentation.manga.components.MissingChapterCountListItem
 import eu.kanade.presentation.util.formatChapterNumber
@@ -369,8 +374,7 @@ private fun MangaScreenSmallImpl(
                         key = MangaScreenItem.INFO_BOX,
                         contentType = MangaScreenItem.INFO_BOX,
                     ) {
-                        MangaInfoBox(
-                            isTabletUi = false,
+                        MangaHeroHeader(
                             appBarPadding = topPadding,
                             manga = state.manga,
                             source = remember { state.source },
@@ -384,7 +388,7 @@ private fun MangaScreenSmallImpl(
                         key = MangaScreenItem.ACTION_ROW,
                         contentType = MangaScreenItem.ACTION_ROW,
                     ) {
-                        MangaActionRow(
+                        MangaPrimaryActions(
                             favorite = state.manga.favorite,
                             trackingCount = state.trackingCount,
                             nextUpdate = nextUpdate,
@@ -399,17 +403,39 @@ private fun MangaScreenSmallImpl(
                     }
 
                     item(
+                        key = MangaScreenItem.READ_PROGRESS,
+                        contentType = MangaScreenItem.READ_PROGRESS,
+                    ) {
+                        val (readCount, totalCount) = remember(state.chapters) {
+                            state.chapters.count { it.chapter.read } to state.chapters.size
+                        }
+                        MangaProgressCard(readCount = readCount, totalCount = totalCount)
+                    }
+
+                    item(
                         key = MangaScreenItem.DESCRIPTION_WITH_TAG,
                         contentType = MangaScreenItem.DESCRIPTION_WITH_TAG,
                     ) {
-                        ExpandableMangaDescription(
-                            defaultExpandState = state.isFromSource,
-                            description = state.manga.description,
-                            tagsProvider = { state.manga.genre },
-                            notes = state.manga.notes,
-                            onTagSearch = onTagSearch,
-                            onCopyTagToClipboard = onCopyTagToClipboard,
-                            onEditNotes = onEditNotesClicked,
+                        MangaDescriptionCard {
+                            ExpandableMangaDescription(
+                                defaultExpandState = state.isFromSource,
+                                description = state.manga.description,
+                                tagsProvider = { state.manga.genre },
+                                notes = state.manga.notes,
+                                onTagSearch = onTagSearch,
+                                onCopyTagToClipboard = onCopyTagToClipboard,
+                                onEditNotes = onEditNotesClicked,
+                            )
+                        }
+                    }
+
+                    item(
+                        key = MangaScreenItem.RECOMMENDATIONS,
+                        contentType = MangaScreenItem.RECOMMENDATIONS,
+                    ) {
+                        MangaRecommendations(
+                            title = state.manga.title,
+                            onRecommendationClick = { onSearch(it, true) },
                         )
                     }
 
