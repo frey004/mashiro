@@ -98,6 +98,7 @@ import eu.kanade.tachiyomi.util.system.isBenchmarkBuildType
 import eu.kanade.tachiyomi.util.system.isNavigationBarNeedsScrim
 import eu.kanade.tachiyomi.util.system.updaterEnabled
 import eu.kanade.tachiyomi.util.view.setComposeContent
+import eu.kanade.presentation.intro.IntroLogoOverlay
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -290,6 +291,9 @@ class MainActivity : BaseActivity() {
                         }
                     }
                 }
+
+                // Animación de entrada con el logo
+                IntroLogoOverlay()
 
                 // Pop source-related screens when incognito mode is turned off
                 LaunchedEffect(Unit) {
