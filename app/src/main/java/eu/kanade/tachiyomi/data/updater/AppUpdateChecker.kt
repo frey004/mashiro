@@ -37,7 +37,7 @@ class AppUpdateChecker(
 }
 
 // Las versiones de ましろ se publican en las releases de este repositorio
-val GITHUB_REPO: String = "frey004/manga"
+val GITHUB_REPO: String = "frey004/mashiro"
 
 val RELEASE_TAG: String by lazy {
     "v${BuildConfig.VERSION_NAME}-r${BuildConfig.BUILD_NUMBER}"
