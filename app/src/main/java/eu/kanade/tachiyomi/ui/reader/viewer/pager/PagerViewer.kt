@@ -112,6 +112,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
                 endCurl()
             } else if (curlAnchor < 0) {
                 curlAnchor = pager.currentItem
+                if (useCurl && bookView == null) attachCurlView()
             }
         }
 
@@ -188,20 +189,11 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     private fun applyPageTurnEffect(enabled: Boolean) {
         val rtl = this is R2LPagerViewer
         val horizontal = this !is VerticalPagerViewer
-        if (enabled && horizontal && ChapterBookView.isSupported(activity)) {
-            // Hoja de papel que se dobla, dibujada encima del pager
+        useCurl = enabled && horizontal && ChapterBookView.isSupported(activity)
+        if (useCurl) {
+            // Hoja de papel que se dobla; la capa se pone encima solo mientras se pasa de página
             pager.setPageTransformer(false, null)
             pager.children.forEach(PageTurnTransformer::reset)
-            if (curlView == null) {
-                val view = PageCurlView(activity, rtl, activity.readerBackgroundColor(config.theme))
-                val container = activity.binding.readerContainer
-                container.addView(
-                    view,
-                    container.indexOfChild(activity.binding.viewerContainer) + 1,
-                    LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
-                )
-                curlView = view
-            }
         } else {
             removeCurlView()
             if (enabled && horizontal) {
@@ -214,10 +206,23 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
         }
     }
 
+    private var useCurl = false
     private var curlView: PageCurlView? = null
     private var curlAnchor = -1
     private var curlTarget = 0
     private var curlForward = true
+
+    private fun attachCurlView() {
+        if (curlView != null) return
+        val view = PageCurlView(activity, this is R2LPagerViewer, activity.readerBackgroundColor(config.theme))
+        val container = activity.binding.readerContainer
+        container.addView(
+            view,
+            container.indexOfChild(activity.binding.viewerContainer) + 1,
+            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
+        )
+        curlView = view
+    }
 
     private fun removeCurlView() {
         curlView?.let { activity.binding.readerContainer.removeView(it) }
@@ -232,7 +237,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
         val view = curlView ?: return
         if (curlAnchor < 0) return
         if (bookView != null) {
-            view.end()
+            removeCurlView()
             return
         }
         val target = when {
@@ -258,7 +263,8 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     }
 
     private fun endCurl() {
-        curlView?.end()
+        // Quitar la capa del todo para que nunca tape las páginas del lector
+        removeCurlView()
         curlAnchor = -1
         curlTarget = 0
     }
