@@ -157,8 +157,8 @@ class ChapterBookView(
             GLES30.glViewport(0, 0, width, height)
             viewWidth = width
             viewHeight = height
-            // La página tiene la proporción de la pantalla para que al final encaje con el lector
-            pw = 2f * PX * width / height.toFloat()
+            // Proporción de un tomo de manga real: 12 de ancho por 17 de alto
+            pw = 2f * PX * BOOK_ASPECT
             objects = buildBook()
         }
 
@@ -241,15 +241,15 @@ class ChapterBookView(
             val (current, other) = pendingNew ?: return
             newPagesShown = true
             // Las texturas viejas se liberan con el contexto al terminar la animación
-            current?.let { texRight = bitmapTexture(it) }
-            texLeft = other?.let(::bitmapTexture) ?: texPaper
+            current?.let { texRight = pageTexture(it) }
+            texLeft = other?.let(::pageTexture) ?: texPaper
         }
 
         private fun uploadPending() {
             pendingOld?.let { (current, other) ->
                 pendingOld = null
-                texRight = bitmapTexture(current)
-                texLeft = other?.let(::bitmapTexture) ?: texPaper
+                texRight = pageTexture(current)
+                texLeft = other?.let(::pageTexture) ?: texPaper
             }
             pendingCover?.let { cover ->
                 pendingCover = null
@@ -295,7 +295,8 @@ class ChapterBookView(
             val tanV = tan(FOVY / 2f)
             val deskDist = max(span * 0.62f / (tanV * asp), PX * 1.35f / tanV)
             val deskTarget = floatArrayOf(0f, 0.4f + 0.3f * coverT, 0f)
-            val fillDist = PX / tanV
+            // Al final la página ocupa todo el ancho, como la página ajustada en el lector
+            val fillDist = max(PX / tanV, pw / 2f / (tanV * asp))
             val fillTarget = floatArrayOf(0f, H, (pw / 2f - shift) * mirror)
             val z = zoom
             val target = FloatArray(3) { deskTarget[it] + (fillTarget[it] - deskTarget[it]) * z }
@@ -349,6 +350,12 @@ class ChapterBookView(
             GLES30.glUniform1f(loc("uMirror"), mirror)
             // Sin luces al final para que la página quede igual que en el lector
             GLES30.glUniform1f(loc("uUnlit"), z.pow(3))
+            GLES30.glUniform3f(
+                loc("uBg"),
+                Color.red(background) / 255f,
+                Color.green(background) / 255f,
+                Color.blue(background) / 255f,
+            )
             GLES30.glUniform3f(loc("uEye"), eye[0], eye[1], eye[2])
             GLES30.glUniform1i(loc("uFront"), 0)
             GLES30.glUniform1i(loc("uBack"), 1)
@@ -357,6 +364,8 @@ class ChapterBookView(
                 GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, obj.front())
                 GLES30.glActiveTexture(GLES30.GL_TEXTURE1)
                 GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, obj.back())
+                // Al acercarse a la página, el resto del libro se funde con el fondo del lector
+                GLES30.glUniform1f(loc("uFocus"), if (obj.focus) 1f else 0f)
                 obj.buffer.position(0)
                 GLES30.glEnableVertexAttribArray(0)
                 GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, STRIDE * 4, obj.buffer)
@@ -415,6 +424,7 @@ class ChapterBookView(
                     },
                     front = if (fromTop == 0) ({ texRight }) else ({ sheetTexture(fromTop * 2) }),
                     back = { sheetTexture(fromTop * 2 + 1) },
+                    focus = fromTop == 0,
                 )
             }
             return list
@@ -477,6 +487,7 @@ class ChapterBookView(
         val buffer: FloatBuffer,
         val front: () -> Int,
         val back: () -> Int,
+        val focus: Boolean = false,
     ) {
         val count = buffer.capacity() / STRIDE
     }
@@ -487,6 +498,9 @@ class ChapterBookView(
         private const val EDGE_EXT = 0.12f // lo que sobresalen las tapas
         private const val SPINE_W = 0.6f
         private const val SHEETS = 10
+
+        /** Ancho / alto de una página del tomo. */
+        const val BOOK_ASPECT = 12f / 17f
         private const val LAG = 0.8f // cuanto mayor, más separadas giran las hojas
         private const val FOVY = 0.62f
         private const val DESK_PITCH = 0.95f
@@ -563,6 +577,9 @@ class ChapterBookView(
             return id
         }
 
+        /** Recorta la captura de pantalla al centro con la forma de la página del tomo. */
+        private fun pageTexture(bitmap: Bitmap): Int = bitmapTexture(cropToAspect(bitmap, BOOK_ASPECT))
+
         private fun solidTexture(color: Int): Int {
             val bmp = Bitmap.createBitmap(2, 2, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
             return bitmapTexture(bmp).also { bmp.recycle() }
@@ -625,7 +642,8 @@ precision highp float;
 in vec3 vN; in vec2 vUv; in vec3 vP;
 uniform sampler2D uFront, uBack;
 uniform vec3 uEye;
-uniform float uMirror, uUnlit;
+uniform float uMirror, uUnlit, uFocus;
+uniform vec3 uBg;
 out vec4 o;
 void main() {
     vec3 n = normalize(vN);
@@ -643,7 +661,8 @@ void main() {
     float spec = pow(max(dot(n, normalize(L + V)), 0.0), 48.0) * 0.08;
     vec3 col = base * (amb + vec3(1.0, 0.97, 0.92) * d1 * 0.62 + vec3(0.75, 0.82, 1.0) * d2 * 0.18) + spec;
     col = pow(col, vec3(0.97));
-    o = vec4(mix(col, base, uUnlit), 1.0);
+    col = mix(col, base, uUnlit);
+    o = vec4(mix(col, uBg, uUnlit * (1.0 - uFocus)), 1.0);
 }"""
 
         private const val SHADOW_VS = """#version 300 es

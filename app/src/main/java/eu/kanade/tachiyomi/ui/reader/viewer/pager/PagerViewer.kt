@@ -257,7 +257,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
         )
         val sheetWidth = min(pager.width.takeIf { it > 0 } ?: 720, SHEET_PAGE_WIDTH)
-        val sheetHeight = sheetWidth * (pager.height.takeIf { it > 0 } ?: 1560) / (pager.width.takeIf { it > 0 } ?: 720)
+        val sheetHeight = (sheetWidth / ChapterBookView.BOOK_ASPECT).toInt()
         scope.launch {
             // Hojas del manga que se cierra: del final del capítulo hacia atrás
             oldChapter?.pages?.asReversed()?.let { pages ->
