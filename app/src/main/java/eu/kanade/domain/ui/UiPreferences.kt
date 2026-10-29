@@ -35,6 +35,9 @@ class UiPreferences(
 
     val relativeTime: Preference<Boolean> = preferenceStore.getBoolean("relative_time_v2", true)
 
+    /** Capítulos como montones de hojas en vez de lista. */
+    val chapterGridView: Preference<Boolean> = preferenceStore.getBoolean("pref_chapter_grid_view", false)
+
     val dateFormat: Preference<String> = preferenceStore.getString("app_date_format", "")
 
     val timeFormat: Preference<TimeFormat> = preferenceStore.getEnum("app_time_format", TimeFormat.FOLLOW_LANGUAGE)

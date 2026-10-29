@@ -48,6 +48,7 @@ import androidx.compose.ui.util.fastMap
 import eu.kanade.presentation.components.relativeDateText
 import eu.kanade.presentation.manga.components.ChapterDownloadAction
 import eu.kanade.presentation.manga.components.ChapterHeader
+import eu.kanade.presentation.manga.components.chapterStackGrid
 import eu.kanade.presentation.manga.components.ExpandableMangaDescription
 import eu.kanade.presentation.manga.components.MangaActionRow
 import eu.kanade.presentation.manga.components.MangaBottomActionMenu
@@ -69,13 +70,16 @@ import eu.kanade.tachiyomi.source.getNameForMangaInfo
 import eu.kanade.tachiyomi.ui.manga.ChapterList
 import eu.kanade.tachiyomi.ui.manga.MangaViewModel
 import eu.kanade.tachiyomi.util.system.copyToClipboard
+import mihon.app.di.appGraph
 import mihon.icons.materialsymbols.MaterialSymbols
 import mihon.icons.materialsymbols.roundedfilled.PlayArrow
+import tachiyomi.core.common.preference.toggle
 import tachiyomi.domain.chapter.model.Chapter
 import tachiyomi.domain.library.service.LibraryPreferences
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.model.StubSource
 import tachiyomi.i18n.MR
+import tachiyomi.presentation.core.util.collectAsState
 import tachiyomi.presentation.core.components.TwoPanelBox
 import tachiyomi.presentation.core.components.VerticalFastScroller
 import tachiyomi.presentation.core.components.material.PullRefresh
@@ -271,6 +275,9 @@ private fun MangaScreenSmallImpl(
 ) {
     val chapterListState = rememberLazyListState()
 
+    val chapterContext = LocalContext.current
+    val uiPreferences = remember { chapterContext.appGraph.uiPreferences }
+    val chapterGrid by uiPreferences.chapterGridView.collectAsState()
     val (chapters, listItem, isAnySelected) = remember(state) {
         Triple(
             first = state.processedChapters,
@@ -452,10 +459,19 @@ private fun MangaScreenSmallImpl(
                             chapterCount = chapters.size,
                             missingChapterCount = state.missingChapterCount,
                             onClick = onFilterClicked,
+                            gridView = chapterGrid,
+                            onToggleGridView = { uiPreferences.chapterGridView.toggle() },
                         )
                     }
 
-                    sharedChapterItems(
+                    if (chapterGrid) {
+                        chapterStackGrid(
+                            manga = state.manga,
+                            chapters = listItem,
+                            isAnyChapterSelected = state.selectedChapters.isNotEmpty(),
+                            onChapterSelected = onChapterSelected,
+                        )
+                    } else sharedChapterItems(
                         manga = state.manga,
                         chapters = listItem,
                         isAnyChapterSelected = state.selectedChapters.isNotEmpty(),
@@ -526,6 +542,9 @@ fun MangaScreenLargeImpl(
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
 
+    val chapterContext = LocalContext.current
+    val uiPreferences = remember { chapterContext.appGraph.uiPreferences }
+    val chapterGrid by uiPreferences.chapterGridView.collectAsState()
     val (chapters, listItem, isAnySelected) = remember(state) {
         Triple(
             first = state.processedChapters,
@@ -677,10 +696,19 @@ fun MangaScreenLargeImpl(
                                     chapterCount = chapters.size,
                                     missingChapterCount = state.missingChapterCount,
                                     onClick = onFilterButtonClicked,
+                                    gridView = chapterGrid,
+                                    onToggleGridView = { uiPreferences.chapterGridView.toggle() },
                                 )
                             }
 
-                            sharedChapterItems(
+                            if (chapterGrid) {
+                                chapterStackGrid(
+                                    manga = state.manga,
+                                    chapters = listItem,
+                                    isAnyChapterSelected = state.selectedChapters.isNotEmpty(),
+                                    onChapterSelected = onChapterSelected,
+                                )
+                            } else sharedChapterItems(
                                 manga = state.manga,
                                 chapters = listItem,
                                 isAnyChapterSelected = state.selectedChapters.isNotEmpty(),

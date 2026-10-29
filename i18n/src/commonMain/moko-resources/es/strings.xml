@@ -608,6 +608,10 @@
     <string name="download_ahead">Descargar por adelantado</string>
     <string name="auto_download_while_reading">Descargar los siguientes capítulos mientras lees</string>
     <string name="are_you_sure">¿Estás seguro?</string>
+    <string name="chapter_short">Cap.</string>
+    <string name="chapter_pages_count">%1$d páginas</string>
+    <string name="chapter_view_grid">Capítulos en cuadrícula</string>
+    <string name="chapter_view_list">Capítulos en lista</string>
     <string name="updates_group_chapters">%1$d capítulos nuevos</string>
     <string name="updates_last_update_info">La biblioteca se actualizó: %s</string>
     <string name="remove_manga">Estás a punto de borrar «%s» de tu biblioteca</string>

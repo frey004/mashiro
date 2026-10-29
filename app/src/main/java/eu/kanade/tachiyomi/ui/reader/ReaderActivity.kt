@@ -109,10 +109,13 @@ class ReaderActivity : BaseActivity() {
     private val graph: AppGraph by lazy { metroGraph() }
 
     companion object {
-        fun newIntent(context: Context, mangaId: Long?, chapterId: Long?): Intent {
+        /** [page] abre el capítulo en esa página (índice desde 0) en vez de donde se dejó. */
+        fun newIntent(context: Context, mangaId: Long?, chapterId: Long?, page: Int? = null): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
                 putExtra("manga", mangaId)
                 putExtra("chapter", chapterId)
+                // El ViewModel lee "page_index" del estado guardado, que parte de estos extras
+                page?.let { putExtra("page_index", it) }
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
         }
