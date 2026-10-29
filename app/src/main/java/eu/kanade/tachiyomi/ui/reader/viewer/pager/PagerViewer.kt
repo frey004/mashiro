@@ -108,6 +108,15 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
 
         override fun onPageScrollStateChanged(state: Int) {
             isIdle = state == ViewPager.SCROLL_STATE_IDLE
+            if (isIdle) {
+                endCurl()
+            } else if (curlAnchor < 0) {
+                curlAnchor = pager.currentItem
+            }
+        }
+
+        override fun onPageScrolled(position: Int, positionOffset: Float, positionOffsetPixels: Int) {
+            updateCurl(position, positionOffset)
         }
     }
 
@@ -159,6 +168,16 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
 
         config.pageTurnEffectChangedListener = ::applyPageTurnEffect
 
+        config.doublePagesChangedListener = {
+            lastChapters?.let { chapters ->
+                val page = currentPage as? ReaderPage
+                setChaptersInternal(chapters)
+                // Las vistas existentes se crearon con una sola página
+                refreshAdapter()
+                page?.let(::moveToPage)
+            }
+        }
+
         config.navigationModeChangedListener = {
             val showOnStart = config.navigationOverlayOnStart || config.forceNavigationOverlay
             activity.binding.navigationOverlay.setNavigation(config.navigator, showOnStart)
@@ -167,21 +186,97 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
 
     /** Efecto de pasar hoja en lectura horizontal. */
     private fun applyPageTurnEffect(enabled: Boolean) {
-        if (enabled && this !is VerticalPagerViewer) {
-            val rtl = this is R2LPagerViewer
-            // La hoja que gira es la de menor índice en izquierda a derecha y la de mayor en derecha a izquierda
-            pager.setPageTransformer(!rtl, PageTurnTransformer(rtl) { activity.readerBackgroundColor(config.theme) })
-        } else {
+        val rtl = this is R2LPagerViewer
+        val horizontal = this !is VerticalPagerViewer
+        if (enabled && horizontal && ChapterBookView.isSupported(activity)) {
+            // Hoja de papel que se dobla, dibujada encima del pager
             pager.setPageTransformer(false, null)
             pager.children.forEach(PageTurnTransformer::reset)
+            if (curlView == null) {
+                val view = PageCurlView(activity, rtl, activity.readerBackgroundColor(config.theme))
+                val container = activity.binding.readerContainer
+                container.addView(
+                    view,
+                    container.indexOfChild(activity.binding.viewerContainer) + 1,
+                    LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
+                )
+                curlView = view
+            }
+        } else {
+            removeCurlView()
+            if (enabled && horizontal) {
+                // Sin OpenGL ES 3: giro sencillo sobre el lomo
+                pager.setPageTransformer(!rtl, PageTurnTransformer(rtl) { activity.readerBackgroundColor(config.theme) })
+            } else {
+                pager.setPageTransformer(false, null)
+                pager.children.forEach(PageTurnTransformer::reset)
+            }
         }
     }
+
+    private var curlView: PageCurlView? = null
+    private var curlAnchor = -1
+    private var curlTarget = 0
+    private var curlForward = true
+
+    private fun removeCurlView() {
+        curlView?.let { activity.binding.readerContainer.removeView(it) }
+        curlView = null
+    }
+
+    /**
+     * Sigue el desplazamiento del pager: la hoja actual se dobla al avanzar y la anterior vuelve
+     * desdoblándose encima al retroceder.
+     */
+    private fun updateCurl(position: Int, offset: Float) {
+        val view = curlView ?: return
+        if (curlAnchor < 0) return
+        if (bookView != null) {
+            view.end()
+            return
+        }
+        val target = when {
+            position == curlAnchor && offset > 0f -> 1
+            position == curlAnchor - 1 -> -1
+            else -> 0
+        }
+        if (target == 0) {
+            if (curlTarget != 0) view.setProgress(if (curlForward) 0f else 1f)
+            return
+        }
+        if (target != curlTarget) {
+            val current = adapter.items.getOrNull(curlAnchor)?.let(::snapshotOf)
+            val other = adapter.items.getOrNull(curlAnchor + target)?.let(::snapshotOf)
+            if (current == null || other == null) return
+            curlTarget = target
+            // Izquierda a derecha avanza hacia +1; derecha a izquierda hacia -1
+            curlForward = (target == 1) != (this is R2LPagerViewer)
+            if (curlForward) view.begin(turning = current, under = other) else view.begin(turning = other, under = current)
+        }
+        val progress = if (target == 1) offset else 1f - offset
+        view.setProgress(if (curlForward) progress else 1f - progress)
+    }
+
+    private fun endCurl() {
+        curlView?.end()
+        curlAnchor = -1
+        curlTarget = 0
+    }
+
+    /** Página que se muestra junto a [page] en doble página, o null. */
+    fun partnerOf(page: ReaderPage): ReaderPage? {
+        if (!config.doublePages || page is InsertPage || page.index % 2 != 0) return null
+        return page.chapter.pages?.getOrNull(page.index + 1)
+    }
+
+    private var lastChapters: ViewerChapters? = null
 
     override fun destroy() {
         super.destroy()
         scope.cancel()
         bookView?.let { activity.binding.readerContainer.removeView(it) }
         bookView = null
+        removeCurlView()
     }
 
     private var bookView: ChapterBookView? = null
@@ -217,6 +312,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
      */
     private fun playChapterBook(previous: Any?, openOnly: Boolean = false) {
         if (bookView != null || !ChapterBookView.isSupported(activity)) return
+        endCurl()
         val shown = if (openOnly) null else previous?.let(::snapshotOf) ?: return
         val rtl = this is R2LPagerViewer
         val background = activity.readerBackgroundColor(config.theme)
@@ -411,7 +507,8 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     private fun onReaderPageSelected(page: ReaderPage, allowPreload: Boolean, forward: Boolean) {
         val pages = page.chapter.pages ?: return
         logcat { "onReaderPageSelected: ${page.number}/${pages.size}" }
-        activity.onPageSelected(page)
+        // En doble página cuenta como leída también la segunda, para que el capítulo se complete
+        activity.onPageSelected(partnerOf(page) ?: page)
 
         // Notify holder of page change
         getPageHolder(page)?.onPageSelected(forward)
@@ -461,6 +558,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
      * Sets the active [chapters] on this pager.
      */
     private fun setChaptersInternal(chapters: ViewerChapters) {
+        lastChapters = chapters
         // Remove listener so the change in item doesn't trigger it
         pager.removeOnPageChangeListener(pagerListener)
 
@@ -494,7 +592,13 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
      * Tells this viewer to move to the given [page].
      */
     override fun moveToPage(page: ReaderPage) {
-        val position = adapter.items.indexOf(page)
+        // En doble página la página impar va dentro de la vista de su pareja
+        val shown = if (config.doublePages && page !is InsertPage && page.index % 2 != 0) {
+            page.chapter.pages?.getOrNull(page.index - 1) ?: page
+        } else {
+            page
+        }
+        val position = adapter.items.indexOf(shown)
         if (position != -1) {
             val currentPosition = pager.currentItem
             pager.setCurrentItem(position, true)

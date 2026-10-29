@@ -125,6 +125,9 @@ class ReaderPreferences(
 
     val dualPageSplitPaged: Preference<Boolean> = preferenceStore.getBoolean("pref_dual_page_split", false)
 
+    /** Dos páginas juntas en cada vista (1 y 2, 3 y 4...). */
+    val doublePages: Preference<Boolean> = preferenceStore.getBoolean("pref_double_pages", false)
+
     val dualPageInvertPaged: Preference<Boolean> = preferenceStore.getBoolean("pref_dual_page_invert", false)
 
     val dualPageSplitWebtoon: Preference<Boolean> = preferenceStore.getBoolean("pref_dual_page_split_webtoon", false)

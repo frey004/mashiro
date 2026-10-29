@@ -1,0 +1,316 @@
+package eu.kanade.tachiyomi.ui.reader.viewer.pager
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.opengl.GLES30
+import android.opengl.GLSurfaceView
+import android.opengl.GLUtils
+import android.opengl.Matrix
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.FloatBuffer
+import javax.microedition.khronos.egl.EGLConfig
+import javax.microedition.khronos.opengles.GL10
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.tan
+
+/**
+ * Capa transparente sobre el pager que, mientras se pasa de página, dibuja la hoja doblándose como
+ * papel: la esquina se levanta, la hoja se enrolla en un cilindro que avanza hasta el lomo y la
+ * parte ya pasada queda volteada encima, con el reverso transparentando la página.
+ *
+ * Sin reflejar se pasa como un libro occidental (se levanta el borde derecho); para derecha a
+ * izquierda se dibuja reflejado y se levanta el borde izquierdo.
+ */
+@SuppressLint("ViewConstructor")
+class PageCurlView(
+    context: Context,
+    rtl: Boolean,
+    private val backgroundColor: Int,
+) : GLSurfaceView(context) {
+
+    private val renderer = CurlRenderer(if (rtl) -1f else 1f)
+
+    @Volatile private var progress = 0f
+
+    @Volatile private var active = false
+
+    init {
+        setEGLContextClientVersion(3)
+        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
+        holder.setFormat(PixelFormat.TRANSLUCENT)
+        setZOrderMediaOverlay(true)
+        setRenderer(renderer)
+        renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+        // Los toques siguen llegando al pager de debajo
+        isClickable = false
+        isFocusable = false
+    }
+
+    /** Empieza un pase: [turning] es la hoja que se dobla y [under] la que queda debajo. */
+    fun begin(turning: Bitmap, under: Bitmap) {
+        queueEvent { renderer.setPages(turning, under) }
+        active = true
+        requestRender()
+    }
+
+    /** 0 = hoja plana, 1 = hoja pasada del todo. */
+    fun setProgress(value: Float) {
+        progress = value.coerceIn(0f, 1f)
+        requestRender()
+    }
+
+    /** Vuelve a dejar ver el pager. */
+    fun end() {
+        active = false
+        requestRender()
+    }
+
+    val isTurning: Boolean
+        get() = active
+
+    private inner class CurlRenderer(private val mirror: Float) : GLSurfaceView.Renderer {
+
+        private var program = 0
+        private var turningTex = 0
+        private var underTex = 0
+        private var hasPages = false
+        private var mesh: FloatBuffer? = null
+        private var vertexCount = 0
+        private var viewWidth = 1
+        private var viewHeight = 1
+        private var pw = 1f
+        private val proj = FloatArray(16)
+        private val view = FloatArray(16)
+        private val vp = FloatArray(16)
+
+        fun setPages(turning: Bitmap, under: Bitmap) {
+            if (turningTex == 0) {
+                val ids = IntArray(2)
+                GLES30.glGenTextures(2, ids, 0)
+                turningTex = ids[0]
+                underTex = ids[1]
+            }
+            upload(turningTex, turning)
+            upload(underTex, under)
+            turning.recycle()
+            under.recycle()
+            hasPages = true
+        }
+
+        private fun upload(id: Int, bitmap: Bitmap) {
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, id)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MIN_FILTER, GLES30.GL_LINEAR)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_MAG_FILTER, GLES30.GL_LINEAR)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
+            GLES30.glTexParameteri(GLES30.GL_TEXTURE_2D, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
+            GLUtils.texImage2D(GLES30.GL_TEXTURE_2D, 0, bitmap, 0)
+        }
+
+        override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+            program = buildProgram()
+            turningTex = 0
+            hasPages = false
+        }
+
+        override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+            GLES30.glViewport(0, 0, width, height)
+            viewWidth = width
+            viewHeight = height
+            // La hoja ocupa exactamente la pantalla
+            pw = 2f * PX * width / height.toFloat()
+            buildMesh()
+        }
+
+        override fun onDrawFrame(gl: GL10?) {
+            if (!active || !hasPages) {
+                GLES30.glClearColor(0f, 0f, 0f, 0f)
+                GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+                return
+            }
+            GLES30.glClearColor(
+                Color.red(backgroundColor) / 255f,
+                Color.green(backgroundColor) / 255f,
+                Color.blue(backgroundColor) / 255f,
+                1f,
+            )
+            GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
+            GLES30.glEnable(GLES30.GL_DEPTH_TEST)
+            GLES30.glDisable(GLES30.GL_CULL_FACE)
+
+            val t = progress
+            val tanV = tan(FOVY / 2f)
+            val dist = PX / tanV
+            val cz = pw / 2f * mirror
+            Matrix.perspectiveM(proj, 0, Math.toDegrees(FOVY.toDouble()).toFloat(), viewWidth / viewHeight.toFloat(), 0.3f, 100f)
+            Matrix.setLookAtM(view, 0, 0f, dist, cz, 0f, 0f, cz, 1f, 0f, 0f)
+            Matrix.multiplyMM(vp, 0, proj, 0, view, 0)
+
+            // Pliegue algo inclinado (la esquina va por delante) que se endereza al acabar
+            val radius = pw * RADIUS_FACTOR
+            val phi = TILT * (1f - 0.6f * t)
+            val nx = sin(phi)
+            val nz = cos(phi)
+            val corners = floatArrayOf(-PX * nx, PX * nx, -PX * nx + pw * nz, PX * nx + pw * nz)
+            val pMin = corners.min()
+            val pMax = corners.max()
+            val c = pMax + (pMin - PI.toFloat() * radius / 2f - radius - pMax) * t
+
+            GLES30.glUseProgram(program)
+            fun loc(name: String) = GLES30.glGetUniformLocation(program, name)
+            GLES30.glUniformMatrix4fv(loc("uVP"), 1, false, vp, 0)
+            GLES30.glUniform2f(loc("uN"), nx, nz)
+            GLES30.glUniform1f(loc("uC"), c)
+            GLES30.glUniform1f(loc("uR"), radius)
+            GLES30.glUniform1f(loc("uMirror"), mirror)
+            GLES30.glUniform3f(loc("uEye"), 0f, dist, cz)
+            GLES30.glUniform3f(loc("uPaper"), 0.96f, 0.94f, 0.9f)
+            GLES30.glActiveTexture(GLES30.GL_TEXTURE0)
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, turningTex)
+            GLES30.glActiveTexture(GLES30.GL_TEXTURE1)
+            GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, underTex)
+            GLES30.glUniform1i(loc("uTop"), 0)
+            GLES30.glUniform1i(loc("uUnder"), 1)
+
+            val buffer = mesh ?: return
+            buffer.position(0)
+            GLES30.glEnableVertexAttribArray(0)
+            GLES30.glVertexAttribPointer(0, 3, GLES30.GL_FLOAT, false, STRIDE * 4, buffer)
+            buffer.position(3)
+            GLES30.glEnableVertexAttribArray(1)
+            GLES30.glVertexAttribPointer(1, 2, GLES30.GL_FLOAT, false, STRIDE * 4, buffer)
+            buffer.position(5)
+            GLES30.glEnableVertexAttribArray(2)
+            GLES30.glVertexAttribPointer(2, 1, GLES30.GL_FLOAT, false, STRIDE * 4, buffer)
+            GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, vertexCount)
+            (0..2).forEach { GLES30.glDisableVertexAttribArray(it) }
+        }
+
+        /** Página de debajo y hoja que se dobla, subdividida para que el pliegue sea suave. */
+        private fun buildMesh() {
+            val data = ArrayList<Float>()
+            fun grid(turn: Float, y: Float, nz: Int, nx: Int) {
+                fun put(x: Float, z: Float) {
+                    data += x; data += y; data += z
+                    data += z / pw; data += (PX - x) / (2f * PX)
+                    data += turn
+                }
+                for (j in 0 until nx) {
+                    val x0 = -PX + 2f * PX * j / nx
+                    val x1 = -PX + 2f * PX * (j + 1) / nx
+                    for (i in 0 until nz) {
+                        val a = pw * i / nz
+                        val b = pw * (i + 1) / nz
+                        put(x0, a); put(x1, a); put(x1, b)
+                        put(x0, a); put(x1, b); put(x0, b)
+                    }
+                }
+            }
+            grid(0f, 0f, 24, 12)
+            grid(1f, 0.003f, 56, 28)
+            vertexCount = data.size / STRIDE
+            mesh = ByteBuffer.allocateDirect(data.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer().apply {
+                put(data.toFloatArray())
+                position(0)
+            }
+        }
+
+        private fun buildProgram(): Int {
+            fun shader(type: Int, src: String): Int {
+                val s = GLES30.glCreateShader(type)
+                GLES30.glShaderSource(s, src)
+                GLES30.glCompileShader(s)
+                val ok = IntArray(1)
+                GLES30.glGetShaderiv(s, GLES30.GL_COMPILE_STATUS, ok, 0)
+                if (ok[0] == 0) logcat(LogPriority.ERROR) { "Curl shader: " + GLES30.glGetShaderInfoLog(s) }
+                return s
+            }
+            val p = GLES30.glCreateProgram()
+            GLES30.glAttachShader(p, shader(GLES30.GL_VERTEX_SHADER, VS))
+            GLES30.glAttachShader(p, shader(GLES30.GL_FRAGMENT_SHADER, FS))
+            GLES30.glLinkProgram(p)
+            return p
+        }
+    }
+
+    private companion object {
+        const val PX = 3.8f
+        const val FOVY = 0.62f
+        const val STRIDE = 6
+        const val RADIUS_FACTOR = 0.13f
+        const val TILT = 0.3f
+
+        const val VS = """#version 300 es
+precision highp float;
+layout(location = 0) in vec3 aPos;
+layout(location = 1) in vec2 aUv;
+layout(location = 2) in float aTurn;
+uniform mat4 uVP;
+uniform vec2 uN;
+uniform float uC, uR, uMirror;
+out vec3 vN; out vec2 vUv; out vec3 vP; out float vTurn; out float vS;
+void main() {
+    vec2 q = vec2(aPos.x, aPos.z);
+    float s = dot(q, uN) - uC;
+    vec3 P = aPos;
+    vec3 N = vec3(0.0, 1.0, 0.0);
+    if (aTurn > 0.5 && s > 0.0) {
+        float halfTurn = 3.14159265 * uR;
+        if (s < halfTurn) {
+            // enrollada en el cilindro del pliegue
+            float th = s / uR;
+            vec2 q2 = q + (uR * sin(th) - s) * uN;
+            P = vec3(q2.x, aPos.y + uR * (1.0 - cos(th)), q2.y);
+            N = vec3(-sin(th) * uN.x, cos(th), -sin(th) * uN.y);
+        } else {
+            // ya pasada: plana y volteada encima
+            vec2 q2 = q + (halfTurn - 2.0 * s) * uN;
+            P = vec3(q2.x, aPos.y + 2.0 * uR, q2.y);
+            N = vec3(0.0, -1.0, 0.0);
+        }
+    }
+    vS = s;
+    P.z *= uMirror;
+    N.z *= uMirror;
+    vN = N; vUv = aUv; vP = P; vTurn = aTurn;
+    gl_Position = uVP * vec4(P, 1.0);
+}"""
+
+        const val FS = """#version 300 es
+precision highp float;
+in vec3 vN; in vec2 vUv; in vec3 vP; in float vTurn; in float vS;
+uniform sampler2D uTop, uUnder;
+uniform vec3 uEye, uPaper;
+uniform float uMirror, uR;
+out vec4 o;
+void main() {
+    vec3 n = normalize(vN);
+    vec3 V = normalize(uEye - vP);
+    bool front = dot(n, V) >= 0.0;
+    if (!front) n = -n;
+    vec2 uv = vUv;
+    if (uMirror < 0.0) uv.x = 1.0 - uv.x;
+    vec3 col;
+    if (vTurn < 0.5) {
+        // sombra de la hoja levantada sobre la página de debajo
+        float sh = vS > 0.0 ? 0.45 * exp(-vS / (2.5 * uR)) : 0.0;
+        col = texture(uUnder, uv).rgb * (1.0 - sh);
+    } else {
+        // el reverso es papel con la página transparentándose
+        vec3 base = front ? texture(uTop, uv).rgb : mix(uPaper, texture(uTop, uv).rgb, 0.15);
+        float shade = mix(0.5, 1.0, max(n.y, 0.0));
+        vec3 L = normalize(vec3(-0.3, 1.0, 0.4 * uMirror));
+        float spec = pow(max(dot(n, normalize(L + V)), 0.0), 30.0) * 0.18 * (1.0 - n.y);
+        col = base * shade + spec;
+    }
+    o = vec4(col, 1.0);
+}"""
+    }
+}

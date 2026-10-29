@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withContext
@@ -55,6 +56,9 @@ class PagerPageHolder(
     private var errorLayout: ReaderErrorBinding? = null
 
     private val scope = MainScope()
+
+    /** Página que acompaña a esta en la vista de doble página. */
+    private val partner: ReaderPage? = viewer.partnerOf(page)
 
     /**
      * Job for loading the page and processing changes to the page's status.
@@ -95,6 +99,9 @@ class PagerPageHolder(
         supervisorScope {
             launch(Dispatchers.IO) {
                 loader.loadPage(page)
+            }
+            partner?.let { other ->
+                launch(Dispatchers.IO) { loader.loadPage(other) }
             }
             page.statusFlow.collectLatest { state ->
                 when (state) {
@@ -150,9 +157,22 @@ class PagerPageHolder(
 
         try {
             val buffer = withContext(Dispatchers.IO) { streamFn().use { Buffer().readFrom(it) } }
+            // En doble página espera a la compañera; si falla se muestra solo esta
+            val partnerBuffer = partner?.let { other ->
+                other.statusFlow.first { it == Page.State.Ready || it is Page.State.Error }
+                other.stream?.takeIf { other.status == Page.State.Ready }?.let { fn ->
+                    withContext(Dispatchers.IO) { fn().use { Buffer().readFrom(it) } }
+                }
+            }
             // Splitting, merging and sampling the background decode the image, which is CPU work
             val (source, isAnimated, background) = withContext(Dispatchers.Default) {
-                val source = process(item, buffer)
+                val source = if (partnerBuffer != null) {
+                    // De derecha a izquierda la primera página queda a la derecha
+                    val (left, right) = if (viewer is L2RPagerViewer) buffer to partnerBuffer else partnerBuffer to buffer
+                    ImageUtil.mergeSideBySide(left, right) ?: buffer
+                } else {
+                    process(item, buffer)
+                }
                 val isAnimated = ImageUtil.isAnimatedAndSupported(source)
                 val background = if (!isAnimated && viewer.config.automaticBackground) {
                     ImageUtil.chooseBackground(context, source.peek().inputStream())
@@ -187,6 +207,11 @@ class PagerPageHolder(
     }
 
     private fun process(page: ReaderPage, imageSource: BufferedSource): BufferedSource {
+        // En doble página no se parten las páginas anchas: ya ocupan la vista doble
+        if (viewer.config.doublePages) {
+            return imageSource
+        }
+
         if (viewer.config.dualPageRotateToFit) {
             return rotateDualPage(imageSource)
         }

@@ -52,7 +52,7 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
         val nextHasMissingChapters = calculateChapterGap(chapters.nextChapter, chapters.currChapter) > 0
 
         // Add previous chapter pages and transition
-        chapters.prevChapter?.pages?.let(newItems::addAll)
+        chapters.prevChapter?.pages?.forLayout()?.let(newItems::addAll)
 
         // Skip transition page if the chapter is loaded & current page is not a transition page
         if (prevHasMissingChapters || forceTransition || chapters.prevChapter?.state !is ReaderChapter.State.Loaded) {
@@ -64,13 +64,13 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
         // Add current chapter.
         val currPages = chapters.currChapter.pages
         if (currPages != null) {
-            val pages = currPages.toMutableList()
+            val pages = currPages.forLayout().toMutableList()
 
             val lastPage = pages.last()
 
             // Insert preprocessed pages into current page list. Pages of the adjacent chapters are split too, and
             // placed by their index, so only this chapter's belong here.
-            preprocessed.filter { it.chapter.chapter.id == chapters.currChapter.chapter.id }
+            preprocessed.filter { it.chapter.chapter.id == chapters.currChapter.chapter.id && !viewer.config.doublePages }
                 .sortedByDescending { it.index }
                 .forEach { page ->
                     if (lastPage.index == page.index) {
@@ -96,7 +96,7 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
                 }
             }
 
-        chapters.nextChapter?.pages?.let(newItems::addAll)
+        chapters.nextChapter?.pages?.forLayout()?.let(newItems::addAll)
 
         val currentItem = items.getOrNull(viewer.pager.currentItem)
 
@@ -125,6 +125,10 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
             viewer.moveToPage(insertPageLastPage)
         }
     }
+
+    /** En doble página cada vista lleva la página par y su compañera, así que solo se listan las pares. */
+    private fun List<ReaderPage>.forLayout(): List<ReaderPage> =
+        if (viewer.config.doublePages) filter { it.index % 2 == 0 } else this
 
     /**
      * Returns the amount of items of the adapter.

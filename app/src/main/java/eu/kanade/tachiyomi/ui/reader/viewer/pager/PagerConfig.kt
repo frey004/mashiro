@@ -33,6 +33,11 @@ class PagerConfig(
 
     var pageTurnEffectChangedListener: ((Boolean) -> Unit)? = null
 
+    var doublePages = false
+        private set
+
+    var doublePagesChangedListener: (() -> Unit)? = null
+
     var chapterBookAnimation = true
         private set
 
@@ -57,6 +62,9 @@ class PagerConfig(
 
         readerPreferences.chapterBookAnimation
             .register({ chapterBookAnimation = it })
+
+        readerPreferences.doublePages
+            .register({ doublePages = it }, { doublePagesChangedListener?.invoke() })
 
         readerPreferences.readerTheme
             .register(

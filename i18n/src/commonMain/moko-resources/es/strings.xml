@@ -58,6 +58,8 @@
     <string name="pref_auto_update_manga_sync">Actualizar progreso al terminar un capítulo</string>
     <string name="pref_fullscreen">Pantalla completa</string>
     <string name="pref_page_transitions">Transiciones de página animadas</string>
+    <string name="pref_double_pages">Doble página</string>
+    <string name="pref_double_pages_summary">Muestra dos páginas juntas (1 y 2, 3 y 4…)</string>
     <string name="pref_page_turn_effect">Efecto de pasar hoja</string>
     <string name="pref_page_turn_effect_summary">Las páginas pasan como hojas de papel en lectura de izquierda a derecha o de derecha a izquierda</string>
     <string name="pref_chapter_book_animation">Animación de libro entre capítulos</string>

@@ -416,6 +416,8 @@
     <string name="pref_double_tap_zoom">Double tap to zoom</string>
     <string name="pref_cutout_short">Show content in cutout area</string>
     <string name="pref_page_transitions">Animate page transitions</string>
+    <string name="pref_double_pages">Double page</string>
+    <string name="pref_double_pages_summary">Show two pages side by side (1 and 2, 3 and 4…)</string>
     <string name="pref_page_turn_effect">Page turn effect</string>
     <string name="pref_page_turn_effect_summary">Pages turn like paper sheets when reading left to right or right to left</string>
     <string name="pref_chapter_book_animation">Book animation between chapters</string>

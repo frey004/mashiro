@@ -258,6 +258,11 @@ object SettingsReaderScreen : SearchableSettings {
                     visible = navMode != 5,
                 ),
                 Preference.PreferenceItem.SwitchPreference(
+                    preference = readerPreferences.doublePages,
+                    title = stringResource(MR.strings.pref_double_pages),
+                    subtitle = stringResource(MR.strings.pref_double_pages_summary),
+                ),
+                Preference.PreferenceItem.SwitchPreference(
                     preference = dualPageSplitPref,
                     title = stringResource(MR.strings.pref_dual_page_split),
                     onValueChanged = {

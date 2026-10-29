@@ -147,6 +147,38 @@ object ImageUtil {
         return output
     }
 
+    /**
+     * Junta dos páginas lado a lado a la misma altura (vista de doble página). Devuelve null si
+     * alguna no se puede decodificar.
+     */
+    fun mergeSideBySide(left: BufferedSource, right: BufferedSource): BufferedSource? {
+        val a = decodeForMerge(left) ?: return null
+        val b = decodeForMerge(right) ?: return null.also { a.recycle() }
+        val height = min(max(a.height, b.height), MAX_MERGED_HEIGHT)
+        val wa = a.width * height / a.height
+        val wb = b.width * height / b.height
+        val result = createBitmap(wa + wb, height)
+        result.applyCanvas {
+            drawColor(Color.WHITE)
+            drawBitmap(a, null, Rect(0, 0, wa, height), null)
+            drawBitmap(b, null, Rect(wa, 0, wa + wb, height), null)
+        }
+        a.recycle()
+        b.recycle()
+        val output = Buffer()
+        result.compress(Bitmap.CompressFormat.JPEG, 92, output.outputStream())
+        result.recycle()
+        return output
+    }
+
+    private fun decodeForMerge(source: BufferedSource): Bitmap? =
+        BitmapFactory.decodeStream(source.peek().inputStream())
+            ?: ImageDecoder.newInstance(source.peek().inputStream())?.let { decoder ->
+                decoder.decode().also { decoder.recycle() }
+            }
+
+    private const val MAX_MERGED_HEIGHT = 2400
+
     fun rotateImage(imageSource: BufferedSource, degrees: Float): BufferedSource {
         val imageBitmap = BitmapFactory.decodeStream(imageSource.inputStream())
         val rotated = rotateBitMap(imageBitmap, degrees)
