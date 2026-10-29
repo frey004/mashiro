@@ -43,17 +43,28 @@ class ChapterBookView(
     context: Context,
     rtl: Boolean,
     backgroundColor: Int,
-    currentPage: Bitmap,
+    /** Solo entra un manga cerrado y se abre (al abrir un capítulo desde fuera del lector). */
+    private val openOnly: Boolean,
+    currentPage: Bitmap?,
     otherPage: Bitmap?,
-    private val requestNewPages: () -> Pair<Bitmap?, Bitmap?>,
+    /** Página actual y la de al lado del capítulo nuevo; null si aún no están listas. */
+    private val requestNewPages: () -> Pair<Bitmap?, Bitmap?>?,
     private val onFinished: () -> Unit,
 ) : GLSurfaceView(context) {
 
     private val renderer = BookRenderer(
         mirror = if (rtl) 1f else -1f,
         background = backgroundColor,
-        oldPages = currentPage to otherPage,
+        oldPages = currentPage?.let { it to otherPage },
     )
+
+    private val requestRunnable = object : Runnable {
+        override fun run() {
+            if (finished) return
+            val pages = requestNewPages()
+            if (pages != null) renderer.deliverNewPages(pages) else postDelayed(this, RETRY_DELAY)
+        }
+    }
 
     init {
         setEGLContextClientVersion(3)
@@ -68,6 +79,11 @@ class ChapterBookView(
         queueEvent { renderer.setCover(cover) }
     }
 
+    /** Páginas del capítulo para las hojas, en orden de lectura desde la que queda a la vista. */
+    fun setSheetPages(newBook: Boolean, pages: List<Bitmap>) {
+        queueEvent { renderer.setSheetPages(newBook, pages) }
+    }
+
     /** Tocar salta la animación. */
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -80,13 +96,14 @@ class ChapterBookView(
     private fun finish() {
         if (finished) return
         finished = true
+        removeCallbacks(requestRunnable)
         onFinished()
     }
 
     private inner class BookRenderer(
         private val mirror: Float,
         private val background: Int,
-        oldPages: Pair<Bitmap, Bitmap?>,
+        oldPages: Pair<Bitmap, Bitmap?>?,
     ) : GLSurfaceView.Renderer {
 
         @Volatile private var pendingOld: Pair<Bitmap, Bitmap?>? = oldPages
@@ -94,6 +111,7 @@ class ChapterBookView(
         @Volatile private var pendingNew: Pair<Bitmap?, Bitmap?>? = null
 
         @Volatile private var pendingCover: Bitmap? = null
+        private val pendingSheets = ArrayDeque<Pair<Boolean, Bitmap>>()
         private var newPagesRequested = false
         private var gaveUp = false
         private var newPagesShown = false
@@ -108,6 +126,8 @@ class ChapterBookView(
         private var texEndpaper = 0
         private var texRight = 0
         private var texLeft = 0
+        private val oldSheetTex = mutableListOf<Int>()
+        private val newSheetTex = mutableListOf<Int>()
 
         private var viewWidth = 1
         private var viewHeight = 1
@@ -129,6 +149,8 @@ class ChapterBookView(
             texEdge = solidTexture(EDGE)
             texEndpaper = solidTexture(Color.rgb(196, 188, 176))
             texCover = texEndpaper
+            texRight = texPaper
+            texLeft = texPaper
         }
 
         override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
@@ -144,28 +166,38 @@ class ChapterBookView(
             pendingCover = cover
         }
 
+        fun setSheetPages(newBook: Boolean, pages: List<Bitmap>) {
+            pages.forEach { pendingSheets.addLast(newBook to it) }
+        }
+
+        fun deliverNewPages(pages: Pair<Bitmap?, Bitmap?>) {
+            pendingNew = pages
+        }
+
         override fun onDrawFrame(gl: GL10?) {
             uploadPending()
             val now = SystemClock.uptimeMillis()
             if (startTime == 0L) startTime = now
 
-            var tm = now - startTime - pausedFor
-            // Espera a tener las páginas del capítulo nuevo antes de mostrar el libro nuevo
-            if (tm >= SWAP_MID && !newPagesShown && !gaveUp) {
+            // El modo de solo abrir empieza con el manga nuevo entrando en escena
+            val origin = if (openOnly) SWAP_MID else 0L
+            var tm = now - startTime - pausedFor + origin
+            // Antes de abrir espera a tener las páginas del capítulo nuevo
+            if (tm >= SWAP_END && !newPagesShown && !gaveUp) {
                 val waiting = pendingNew == null
                 if (waiting) {
                     if (pauseStart == 0L) pauseStart = now
-                    if (now - pauseStart < MAX_WAIT) tm = SWAP_MID else gaveUp = true
+                    if (now - pauseStart < if (openOnly) MAX_WAIT_OPEN else MAX_WAIT) tm = SWAP_END else gaveUp = true
                 }
                 if ((!waiting || gaveUp) && pauseStart != 0L) {
                     pausedFor += now - pauseStart
                     pauseStart = 0L
-                    tm = now - startTime - pausedFor
+                    tm = now - startTime - pausedFor + origin
                 }
             }
-            if (tm >= CLOSE_END && !newPagesRequested) {
+            if (!newPagesRequested && (openOnly || tm >= CLOSE_END)) {
                 newPagesRequested = true
-                post { pendingNew = requestNewPages() }
+                post(requestRunnable)
             }
 
             // t: 0 abierto, 1 cerrado. zoom: 1 = la página llena la pantalla
@@ -175,13 +207,13 @@ class ChapterBookView(
             val exit = pw * 2.6f
             when {
                 tm < CLOSE_END -> {
-                    zoom = 1f - ease(tm / 520f)
-                    t = ease((tm - 260f) / (CLOSE_END - 260f))
+                    zoom = 1f - ease(tm / ZOOM_OUT.toFloat())
+                    t = ((tm - CLOSE_START) / CLOSE_LEN.toFloat()).coerceIn(0f, 1f)
                 }
                 tm < SWAP_END -> {
                     t = 1f
                     zoom = 0f
-                    val k = (tm - CLOSE_END) / (SWAP_END - CLOSE_END).toFloat()
+                    val k = (tm - CLOSE_END) / SWAP_LEN.toFloat()
                     offset = if (k < 0.5f) {
                         exit * ease(k * 2f)
                     } else {
@@ -192,8 +224,8 @@ class ChapterBookView(
                 tm < OPEN_END -> {
                     showNewPages()
                     val k = tm - SWAP_END
-                    t = 1f - ease(k / 1050f)
-                    zoom = ease((k - 900f) / (OPEN_END - SWAP_END - 900f))
+                    t = 1f - (k / OPEN_LEN.toFloat()).coerceIn(0f, 1f)
+                    zoom = ease((k - OPEN_LEN + 250f) / ZOOM_IN.toFloat())
                 }
                 else -> {
                     post { finish() }
@@ -224,6 +256,19 @@ class ChapterBookView(
                 texCover = bitmapTexture(cropToAspect(cover, pw / (2f * PX)))
                 texEndpaper = solidTexture(averageColor(cover))
             }
+            // Pocas por fotograma para no dar tirones
+            repeat(2) {
+                val (newBook, bitmap) = pendingSheets.removeFirstOrNull() ?: return
+                (if (newBook) newSheetTex else oldSheetTex) += bitmapTexture(bitmap)
+                bitmap.recycle()
+            }
+        }
+
+        /** Textura de la página [index] del manga que se ve ahora (0 = la que queda a la vista). */
+        private fun sheetTexture(index: Int): Int {
+            val list = if (newPagesShown) newSheetTex else oldSheetTex
+            if (list.isEmpty()) return if (index % 2 == 0) texLeft else texRight
+            return list[index % list.size]
         }
 
         private fun draw(t: Float, zoom: Float, offset: Float) {
@@ -238,7 +283,10 @@ class ChapterBookView(
 
             // Centra el libro mientras se pliega: abierto ocupa las dos mitades, cerrado solo una
             val zMin = -pw - EDGE_EXT
-            val tf = min(1f, t * 2f)
+            // La tapa es la última en cerrarse y la que marca lo que ocupa el libro
+            val coverOpen = ((1f - t) / (1f - LAG)).coerceIn(0f, 1f)
+            val coverT = 1f - smooth(coverOpen)
+            val tf = min(1f, coverT * 2f)
             val zHi = pw + EDGE_EXT + (0.35f - pw - EDGE_EXT) * smooth(tf)
             val shift = (zMin + zHi) / 2f
             val span = zHi - zMin
@@ -246,7 +294,7 @@ class ChapterBookView(
             // Cámara de mesa (como en la maqueta) y cámara cenital sobre la página actual
             val tanV = tan(FOVY / 2f)
             val deskDist = max(span * 0.62f / (tanV * asp), PX * 1.35f / tanV)
-            val deskTarget = floatArrayOf(0f, 0.4f + 0.3f * t, 0f)
+            val deskTarget = floatArrayOf(0f, 0.4f + 0.3f * coverT, 0f)
             val fillDist = PX / tanV
             val fillTarget = floatArrayOf(0f, H, (pw / 2f - shift) * mirror)
             val z = zoom
@@ -356,16 +404,17 @@ class ChapterBookView(
                 front = { texEndpaper },
                 back = { texCover },
             )
-            // Hojas: la de arriba es la página que se ve al estar abierto
+            // Hojas: la de arriba es la página que se ve al estar abierto y las de debajo siguen el
+            // capítulo, dos páginas por hoja (anverso y reverso)
             for (i in 0 until SHEETS) {
                 val y = H * (i + 1) / SHEETS
-                val top = i == SHEETS - 1
+                val fromTop = SHEETS - 1 - i
                 list += BookObject(
                     grid(-PX, PX, 0f, pw, y, up = true, lv = i / (SHEETS - 1f), segments = 30, spine = true) { z ->
                         z / pw
                     },
-                    front = if (top) ({ texRight }) else if (i % 2 == 0) ({ texLeft }) else ({ texRight }),
-                    back = if (i % 2 == 0) ({ texRight }) else ({ texLeft }),
+                    front = if (fromTop == 0) ({ texRight }) else ({ sheetTexture(fromTop * 2) }),
+                    back = { sheetTexture(fromTop * 2 + 1) },
                 )
             }
             return list
@@ -437,17 +486,25 @@ class ChapterBookView(
         private const val H = 0.4f // grosor de cada bloque de páginas
         private const val EDGE_EXT = 0.12f // lo que sobresalen las tapas
         private const val SPINE_W = 0.6f
-        private const val SHEETS = 14
-        private const val LAG = 0.5f
+        private const val SHEETS = 10
+        private const val LAG = 0.8f // cuanto mayor, más separadas giran las hojas
         private const val FOVY = 0.62f
         private const val DESK_PITCH = 0.95f
         private const val STRIDE = 9
 
-        private const val CLOSE_END = 1300L
-        private const val SWAP_END = 1800L
-        private const val SWAP_MID = (CLOSE_END + SWAP_END) / 2
-        private const val OPEN_END = 3250L
-        private const val MAX_WAIT = 1500L
+        private const val ZOOM_OUT = 700L
+        private const val CLOSE_START = 350L
+        private const val CLOSE_LEN = 2800L
+        private const val CLOSE_END = CLOSE_START + CLOSE_LEN
+        private const val SWAP_LEN = 800L
+        private const val SWAP_END = CLOSE_END + SWAP_LEN
+        private const val SWAP_MID = CLOSE_END + SWAP_LEN / 2
+        private const val OPEN_LEN = 3400L
+        private const val ZOOM_IN = 800L
+        private const val OPEN_END = SWAP_END + OPEN_LEN - 250L + ZOOM_IN
+        private const val MAX_WAIT = 2500L
+        private const val MAX_WAIT_OPEN = 8000L
+        private const val RETRY_DELAY = 250L
 
         private val PAPER = Color.rgb(244, 240, 232)
         private val EDGE = Color.rgb(232, 226, 212)
@@ -550,7 +607,7 @@ void main() {
     float frac = tl;
     if (aLv >= 0.0) {
         float zr = clamp(aPos.z / uPW, 0.0, 1.0);
-        frac = min(1.0, tl + 0.16 * sin(3.14159265 * tl) * pow(zr, 1.5));
+        frac = min(1.0, tl + 0.24 * sin(3.14159265 * tl) * pow(zr, 1.5));
     }
     float a = 3.14159265 * frac * s;
     float c = cos(a), sn = sin(a);

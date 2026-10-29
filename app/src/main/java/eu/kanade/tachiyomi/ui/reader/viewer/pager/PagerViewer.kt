@@ -1,8 +1,11 @@
 package eu.kanade.tachiyomi.ui.reader.viewer.pager
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.graphics.PointF
+import android.graphics.RectF
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -28,9 +31,12 @@ import eu.kanade.tachiyomi.ui.reader.viewer.Viewer
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation.NavigationRegion
 import eu.kanade.tachiyomi.util.system.readerBackgroundColor
 import eu.kanade.tachiyomi.widget.ViewPagerAdapter
+import eu.kanade.tachiyomi.source.model.Page
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import mihon.app.di.appGraph
 import tachiyomi.core.common.util.system.logcat
 import kotlin.math.min
@@ -179,6 +185,11 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     }
 
     private var bookView: ChapterBookView? = null
+
+    private companion object {
+        const val SHEET_PAGES = 20
+        const val SHEET_PAGE_WIDTH = 400
+    }
     private var lastPageSnapshot: Bitmap? = null
 
     /** Captura lo que muestra la vista de [item] si sigue montada en el pager. */
@@ -200,25 +211,39 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
         return bitmap
     }
 
-    /** Cierra el manga del capítulo terminado y abre otro en el capítulo siguiente. */
-    private fun playChapterBook(previous: Any?) {
+    /**
+     * Cierra el manga del capítulo terminado y abre otro en el capítulo siguiente. Con
+     * [openOnly] solo entra un manga cerrado y se abre en el capítulo actual.
+     */
+    private fun playChapterBook(previous: Any?, openOnly: Boolean = false) {
         if (bookView != null || !ChapterBookView.isSupported(activity)) return
-        val shown = previous?.let(::snapshotOf) ?: return
+        val shown = if (openOnly) null else previous?.let(::snapshotOf) ?: return
         val rtl = this is R2LPagerViewer
+        val background = activity.readerBackgroundColor(config.theme)
         // Si se venía de la pantalla de transición, al lado queda la última página del capítulo
         val other = lastPageSnapshot.takeIf { previous is ChapterTransition }
         lastPageSnapshot = null
+        val oldChapter = when (previous) {
+            is ReaderPage -> previous.chapter
+            is ChapterTransition.Next -> previous.from
+            else -> null
+        }
+        var readyChecks = 0
         val container = activity.binding.readerContainer
         val view = ChapterBookView(
             context = activity,
             rtl = rtl,
-            backgroundColor = activity.readerBackgroundColor(config.theme),
+            backgroundColor = background,
+            openOnly = openOnly,
             currentPage = shown,
             otherPage = other,
-            requestNewPages = {
+            requestNewPages = request@{
                 val current = adapter.items.getOrNull(pager.currentItem)
+                // Espera a que la página esté cargada y dibujada para que el final encaje
+                if (current is ReaderPage && current.status != Page.State.Ready) return@request null
+                if (current is ReaderPage && readyChecks++ < 2) return@request null
                 val next = adapter.items.getOrNull(pager.currentItem + if (rtl) -1 else 1)
-                current?.let(::snapshotOf) to next?.let(::snapshotOf)
+                (current?.let(::snapshotOf) ?: return@request null) to next?.let(::snapshotOf)
             },
             onFinished = {
                 bookView?.let(container::removeView)
@@ -231,6 +256,19 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             container.indexOfChild(activity.binding.viewerContainer) + 1,
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT),
         )
+        val sheetWidth = min(pager.width.takeIf { it > 0 } ?: 720, SHEET_PAGE_WIDTH)
+        val sheetHeight = sheetWidth * (pager.height.takeIf { it > 0 } ?: 1560) / (pager.width.takeIf { it > 0 } ?: 720)
+        scope.launch {
+            // Hojas del manga que se cierra: del final del capítulo hacia atrás
+            oldChapter?.pages?.asReversed()?.let { pages ->
+                view.setSheetPages(false, decodeSheetPages(pages, background, sheetWidth, sheetHeight))
+            }
+            // Hojas del manga que se abre: el capítulo desde su primera página
+            val newChapter = (adapter.items.getOrNull(pager.currentItem) as? ReaderPage)?.chapter
+            newChapter?.pages?.let { pages ->
+                view.setSheetPages(true, decodeSheetPages(pages, background, sheetWidth, sheetHeight))
+            }
+        }
         val manga = activity.viewModel.manga ?: return
         scope.launch {
             val result = activity.imageLoader.execute(
@@ -243,6 +281,47 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             val cover = (result as? SuccessResult)?.image?.asDrawable(activity.resources)?.toBitmap()
             if (cover != null) bookView?.setCover(cover)
         }
+    }
+
+    /** Decodifica en pequeño las páginas ya descargadas, centradas sobre el fondo del lector. */
+    private suspend fun decodeSheetPages(
+        pages: List<ReaderPage>,
+        background: Int,
+        width: Int,
+        height: Int,
+    ): List<Bitmap> = withContext(Dispatchers.IO) {
+        pages.asSequence()
+            .filter { it !is InsertPage && it.status == Page.State.Ready && it.stream != null }
+            .take(SHEET_PAGES)
+            .mapNotNull { page ->
+                runCatching {
+                    val stream = page.stream!!
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    stream().use { BitmapFactory.decodeStream(it, null, bounds) }
+                    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+                    var sample = 1
+                    while (bounds.outWidth / (sample * 2) >= width) sample *= 2
+                    val image = stream().use {
+                        BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample })
+                    } ?: return@runCatching null
+                    val out = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+                    val fit = min(width / image.width.toFloat(), height / image.height.toFloat())
+                    val w = image.width * fit
+                    val h = image.height * fit
+                    Canvas(out).apply {
+                        drawColor(background)
+                        drawBitmap(
+                            image,
+                            null,
+                            RectF((width - w) / 2f, (height - h) / 2f, (width + w) / 2f, (height + h) / 2f),
+                            Paint(Paint.FILTER_BITMAP_FLAG),
+                        )
+                    }
+                    image.recycle()
+                    out
+                }.getOrNull()
+            }
+            .toList()
     }
 
     /**
@@ -387,6 +466,14 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
 
         val forceTransition = config.alwaysShowChapterTransition ||
             adapter.items.getOrNull(pager.currentItem) is ChapterTransition
+        // Se abre un capítulo sin llegar a él pasando páginas (desde la ficha del manga o el menú)
+        val chapterOfCurrent = when (val item = currentPage) {
+            is ReaderPage -> item.chapter
+            is ChapterTransition -> item.from
+            else -> null
+        }
+        val opensChapter = config.chapterBookAnimation && this !is VerticalPagerViewer &&
+            chapterOfCurrent != chapters.currChapter
         adapter.setChapters(chapters, forceTransition)
 
         // Layout the pager once a chapter is being set
@@ -400,6 +487,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
         pager.addOnPageChangeListener(pagerListener)
         // Manually call onPageChange to update the UI
         onPageChange(pager.currentItem)
+        if (opensChapter) playChapterBook(previous = null, openOnly = true)
     }
 
     /**
