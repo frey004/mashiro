@@ -89,7 +89,7 @@ class ChapterPagesScreen(
     override fun Content() {
         val navigator = LocalNavigator.currentOrThrow
         val context = LocalContext.current
-        val viewModel = assistedMetroViewModel<Model, Model.Factory> { create(mangaId, chapterId) }
+        val viewModel = assistedMetroViewModel<Model, Model.Factory> { create(Ids(mangaId, chapterId)) }
         val state by viewModel.state.collectAsState()
 
         Scaffold(
@@ -198,8 +198,7 @@ class ChapterPagesScreen(
 
     @AssistedInject
     class Model(
-        @Assisted("mangaId") private val mangaId: Long,
-        @Assisted("chapterId") private val chapterId: Long,
+        @Assisted private val ids: Ids,
         @AppCoroutineScope private val appScope: CoroutineScope,
         private val context: Context,
         private val getManga: GetManga,
@@ -218,8 +217,8 @@ class ChapterPagesScreen(
         init {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    val manga = getManga.await(mangaId) ?: error("Manga not found")
-                    val chapter = getChapter.await(chapterId) ?: error("Chapter not found")
+                    val manga = getManga.await(ids.mangaId) ?: error("Manga not found")
+                    val chapter = getChapter.await(ids.chapterId) ?: error("Chapter not found")
                     state.update { it.copy(title = chapter.name) }
                     val loader = ChapterLoader(
                         context,
@@ -253,9 +252,11 @@ class ChapterPagesScreen(
         @ManualViewModelAssistedFactoryKey
         @ContributesIntoMap(AppScope::class)
         interface Factory : ManualViewModelAssistedFactory {
-            fun create(@Assisted("mangaId") mangaId: Long, @Assisted("chapterId") chapterId: Long): Model
+            fun create(ids: Ids): Model
         }
     }
+
+    data class Ids(val mangaId: Long, val chapterId: Long)
 
     @Immutable
     data class State(
