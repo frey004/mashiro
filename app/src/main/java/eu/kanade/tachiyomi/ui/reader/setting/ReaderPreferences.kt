@@ -22,6 +22,12 @@ class ReaderPreferences(
 
     val pageTransitions: Preference<Boolean> = preferenceStore.getBoolean("pref_enable_transitions_key", true)
 
+    /** Pasar página como una hoja de papel (lectura horizontal paginada). */
+    val pageTurnEffect: Preference<Boolean> = preferenceStore.getBoolean("pref_page_turn_effect", true)
+
+    /** Al cambiar de capítulo, cerrar el manga y abrir el siguiente. */
+    val chapterBookAnimation: Preference<Boolean> = preferenceStore.getBoolean("pref_chapter_book_animation", true)
+
     val loadAheadOnlyOverWifi: Preference<Boolean> = preferenceStore.getBoolean(
         "pref_reader_load_ahead_only_over_wifi",
         true,

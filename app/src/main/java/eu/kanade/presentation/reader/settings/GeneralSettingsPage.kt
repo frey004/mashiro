@@ -133,6 +133,16 @@ internal fun ColumnScope.GeneralPage(viewModel: ReaderSettingsViewModel) {
     )
 
     CheckboxItem(
+        label = stringResource(MR.strings.pref_page_turn_effect),
+        pref = viewModel.preferences.pageTurnEffect,
+    )
+
+    CheckboxItem(
+        label = stringResource(MR.strings.pref_chapter_book_animation),
+        pref = viewModel.preferences.chapterBookAnimation,
+    )
+
+    CheckboxItem(
         label = stringResource(MR.strings.pref_flash_page),
         pref = viewModel.preferences.flashOnPageChange,
     )

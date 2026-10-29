@@ -60,6 +60,16 @@ object SettingsReaderScreen : SearchableSettings {
                 title = stringResource(MR.strings.pref_page_transitions),
             ),
             Preference.PreferenceItem.SwitchPreference(
+                preference = readerPref.pageTurnEffect,
+                title = stringResource(MR.strings.pref_page_turn_effect),
+                subtitle = stringResource(MR.strings.pref_page_turn_effect_summary),
+            ),
+            Preference.PreferenceItem.SwitchPreference(
+                preference = readerPref.chapterBookAnimation,
+                title = stringResource(MR.strings.pref_chapter_book_animation),
+                subtitle = stringResource(MR.strings.pref_chapter_book_animation_summary),
+            ),
+            Preference.PreferenceItem.SwitchPreference(
                 preference = readerPref.loadAheadOnlyOverWifi,
                 title = stringResource(MR.strings.pref_load_ahead_only_over_wifi),
                 subtitle = stringResource(MR.strings.pref_load_ahead_only_over_wifi_summary),

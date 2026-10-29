@@ -31,6 +31,11 @@ class PagerConfig(
 
     var dualPageSplitChangedListener: ((Boolean) -> Unit)? = null
 
+    var pageTurnEffectChangedListener: ((Boolean) -> Unit)? = null
+
+    var chapterBookAnimation = true
+        private set
+
     var imageScaleType = 1
         private set
 
@@ -47,6 +52,12 @@ class PagerConfig(
         private set
 
     init {
+        readerPreferences.pageTurnEffect
+            .register({}, { pageTurnEffectChangedListener?.invoke(it) })
+
+        readerPreferences.chapterBookAnimation
+            .register({ chapterBookAnimation = it })
+
         readerPreferences.readerTheme
             .register(
                 {

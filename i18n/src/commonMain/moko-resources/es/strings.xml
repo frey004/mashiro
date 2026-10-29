@@ -58,6 +58,10 @@
     <string name="pref_auto_update_manga_sync">Actualizar progreso al terminar un capítulo</string>
     <string name="pref_fullscreen">Pantalla completa</string>
     <string name="pref_page_transitions">Transiciones de página animadas</string>
+    <string name="pref_page_turn_effect">Efecto de pasar hoja</string>
+    <string name="pref_page_turn_effect_summary">Las páginas pasan como hojas de papel en lectura de izquierda a derecha o de derecha a izquierda</string>
+    <string name="pref_chapter_book_animation">Animación de libro entre capítulos</string>
+    <string name="pref_chapter_book_animation_summary">El manga se cierra y se abre otro en el capítulo siguiente</string>
     <string name="pref_show_page_number">Mostrar el número de página</string>
     <string name="pref_custom_brightness">Utilizar brillo personalizado</string>
     <string name="pref_keep_screen_on">Mantener la pantalla encendida</string>

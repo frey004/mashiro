@@ -18,6 +18,7 @@ import eu.kanade.tachiyomi.ui.reader.model.ReaderPage
 import eu.kanade.tachiyomi.ui.reader.model.ViewerChapters
 import eu.kanade.tachiyomi.ui.reader.viewer.Viewer
 import eu.kanade.tachiyomi.ui.reader.viewer.ViewerNavigation.NavigationRegion
+import eu.kanade.tachiyomi.util.system.readerBackgroundColor
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
 import mihon.app.di.appGraph
@@ -140,9 +141,23 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             refreshAdapter()
         }
 
+        config.pageTurnEffectChangedListener = ::applyPageTurnEffect
+
         config.navigationModeChangedListener = {
             val showOnStart = config.navigationOverlayOnStart || config.forceNavigationOverlay
             activity.binding.navigationOverlay.setNavigation(config.navigator, showOnStart)
+        }
+    }
+
+    /** Efecto de pasar hoja en lectura horizontal. */
+    private fun applyPageTurnEffect(enabled: Boolean) {
+        if (enabled && this !is VerticalPagerViewer) {
+            val rtl = this is R2LPagerViewer
+            // La hoja que gira es la de menor índice en izquierda a derecha y la de mayor en derecha a izquierda
+            pager.setPageTransformer(!rtl, PageTurnTransformer(rtl) { activity.readerBackgroundColor(config.theme) })
+        } else {
+            pager.setPageTransformer(false, null)
+            pager.children.forEach(PageTurnTransformer::reset)
         }
     }
 
@@ -191,6 +206,13 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
                 currentPage is ChapterTransition.Prev && page is ReaderPage ->
                     false
                 else -> true
+            }
+            // Paso al capítulo siguiente: se cierra este manga y se abre el siguiente
+            val entersNextChapter = page is ReaderPage &&
+                (page.chapter == (currentPage as? ChapterTransition.Next)?.to ||
+                    (currentPage is ReaderPage && page.chapter == adapter.nextTransition?.to))
+            if (entersNextChapter && config.chapterBookAnimation && this !is VerticalPagerViewer) {
+                ChapterBookAnimator.play(pager, rtl = this is R2LPagerViewer)
             }
             currentPage = page
             when (page) {
