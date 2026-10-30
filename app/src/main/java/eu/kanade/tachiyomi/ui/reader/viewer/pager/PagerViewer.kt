@@ -112,7 +112,6 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
                 endCurl()
             } else if (curlAnchor < 0) {
                 curlAnchor = pager.currentItem
-                if (useCurl && bookView == null) attachCurlView()
             }
         }
 
@@ -191,9 +190,10 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
         val horizontal = this !is VerticalPagerViewer
         useCurl = enabled && horizontal && ChapterBookView.isSupported(activity)
         if (useCurl) {
-            // Hoja de papel que se dobla; la capa se pone encima solo mientras se pasa de página
+            // Hoja de papel que se dobla, en una capa transparente encima del pager
             pager.setPageTransformer(false, null)
             pager.children.forEach(PageTurnTransformer::reset)
+            attachCurlView()
         } else {
             removeCurlView()
             if (enabled && horizontal) {
@@ -237,7 +237,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
         val view = curlView ?: return
         if (curlAnchor < 0) return
         if (bookView != null) {
-            removeCurlView()
+            view.end()
             return
         }
         val target = when {
@@ -263,8 +263,8 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     }
 
     private fun endCurl() {
-        // Quitar la capa del todo para que nunca tape las páginas del lector
-        removeCurlView()
+        // La capa vuelve a ser transparente
+        curlView?.end()
         curlAnchor = -1
         curlTarget = 0
     }

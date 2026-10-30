@@ -4,18 +4,24 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.PixelFormat
+import android.graphics.SurfaceTexture
+import android.opengl.EGL14
+import android.opengl.EGLConfig
+import android.opengl.EGLContext
+import android.opengl.EGLDisplay
+import android.opengl.EGLExt
+import android.opengl.EGLSurface
 import android.opengl.GLES30
-import android.opengl.GLSurfaceView
 import android.opengl.GLUtils
 import android.opengl.Matrix
+import android.os.Handler
+import android.os.HandlerThread
+import android.view.TextureView
 import logcat.LogPriority
 import tachiyomi.core.common.util.system.logcat
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
-import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.opengles.GL10
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -34,21 +40,28 @@ class PageCurlView(
     context: Context,
     rtl: Boolean,
     private val backgroundColor: Int,
-) : GLSurfaceView(context) {
+) : TextureView(context), TextureView.SurfaceTextureListener {
 
+    // TextureView y no SurfaceView: es transparente desde el primer momento, así que no da un
+    // pestañeo negro al aparecer ni puede tapar las páginas mientras no dibuja
     private val renderer = CurlRenderer(if (rtl) -1f else 1f)
+    private val glThread = HandlerThread("PageCurl").apply { start() }
+    private val glHandler = Handler(glThread.looper)
+    private var egl: EglState? = null
 
     @Volatile private var progress = 0f
 
     @Volatile private var active = false
 
+    private val drawRunnable = Runnable {
+        val state = egl ?: return@Runnable
+        renderer.onDrawFrame()
+        state.swap()
+    }
+
     init {
-        setEGLContextClientVersion(3)
-        setEGLConfigChooser(8, 8, 8, 8, 16, 0)
-        holder.setFormat(PixelFormat.TRANSLUCENT)
-        setZOrderMediaOverlay(true)
-        setRenderer(renderer)
-        renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+        isOpaque = false
+        surfaceTextureListener = this
         // Los toques siguen llegando al pager de debajo
         isClickable = false
         isFocusable = false
@@ -56,7 +69,7 @@ class PageCurlView(
 
     /** Empieza un pase: [turning] es la hoja que se dobla y [under] la que queda debajo. */
     fun begin(turning: Bitmap, under: Bitmap) {
-        queueEvent { renderer.setPages(turning, under) }
+        glHandler.post { renderer.setPages(turning, under) }
         active = true
         requestRender()
     }
@@ -73,10 +86,96 @@ class PageCurlView(
         requestRender()
     }
 
-    val isTurning: Boolean
-        get() = active
+    private fun requestRender() {
+        glHandler.removeCallbacks(drawRunnable)
+        glHandler.post(drawRunnable)
+    }
 
-    private inner class CurlRenderer(private val mirror: Float) : GLSurfaceView.Renderer {
+    override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
+        glHandler.post {
+            egl = runCatching { EglState(surface) }
+                .onFailure { logcat(LogPriority.ERROR, it) { "Page curl EGL setup failed" } }
+                .getOrNull()
+                ?: return@post
+            renderer.onSurfaceCreated()
+            renderer.onSurfaceChanged(width, height)
+            drawRunnable.run()
+        }
+    }
+
+    override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, width: Int, height: Int) {
+        glHandler.post {
+            if (egl == null) return@post
+            renderer.onSurfaceChanged(width, height)
+            drawRunnable.run()
+        }
+    }
+
+    override fun onSurfaceTextureDestroyed(surface: SurfaceTexture): Boolean {
+        // Se libera en el hilo de dibujo cuando ya no se usa
+        glHandler.post {
+            egl?.release()
+            egl = null
+            surface.release()
+        }
+        return false
+    }
+
+    override fun onSurfaceTextureUpdated(surface: SurfaceTexture) = Unit
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        glThread.quitSafely()
+    }
+
+    /** Contexto OpenGL ES 3 propio sobre la textura de la vista. */
+    private class EglState(texture: SurfaceTexture) {
+        private val display: EGLDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
+        private val context: EGLContext
+        private val surface: EGLSurface
+
+        init {
+            val version = IntArray(2)
+            check(EGL14.eglInitialize(display, version, 0, version, 1)) { "eglInitialize" }
+            val configs = arrayOfNulls<EGLConfig>(1)
+            val count = IntArray(1)
+            val attribs = intArrayOf(
+                EGL14.EGL_RED_SIZE, 8,
+                EGL14.EGL_GREEN_SIZE, 8,
+                EGL14.EGL_BLUE_SIZE, 8,
+                EGL14.EGL_ALPHA_SIZE, 8,
+                EGL14.EGL_DEPTH_SIZE, 16,
+                EGL14.EGL_RENDERABLE_TYPE, EGLExt.EGL_OPENGL_ES3_BIT_KHR,
+                EGL14.EGL_NONE,
+            )
+            check(EGL14.eglChooseConfig(display, attribs, 0, configs, 0, 1, count, 0) && count[0] > 0) {
+                "eglChooseConfig"
+            }
+            val config = configs[0]!!
+            context = EGL14.eglCreateContext(
+                display,
+                config,
+                EGL14.EGL_NO_CONTEXT,
+                intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE),
+                0,
+            )
+            surface = EGL14.eglCreateWindowSurface(display, config, texture, intArrayOf(EGL14.EGL_NONE), 0)
+            check(EGL14.eglMakeCurrent(display, surface, surface, context)) { "eglMakeCurrent" }
+        }
+
+        fun swap() {
+            EGL14.eglSwapBuffers(display, surface)
+        }
+
+        fun release() {
+            EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT)
+            EGL14.eglDestroySurface(display, surface)
+            EGL14.eglDestroyContext(display, context)
+            EGL14.eglReleaseThread()
+        }
+    }
+
+    private inner class CurlRenderer(private val mirror: Float) {
 
         private var program = 0
         private var turningTex = 0
@@ -114,13 +213,13 @@ class PageCurlView(
             GLUtils.texImage2D(GLES30.GL_TEXTURE_2D, 0, bitmap, 0)
         }
 
-        override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        fun onSurfaceCreated() {
             program = buildProgram()
             turningTex = 0
             hasPages = false
         }
 
-        override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        fun onSurfaceChanged(width: Int, height: Int) {
             GLES30.glViewport(0, 0, width, height)
             viewWidth = width
             viewHeight = height
@@ -129,7 +228,7 @@ class PageCurlView(
             buildMesh()
         }
 
-        override fun onDrawFrame(gl: GL10?) {
+        fun onDrawFrame() {
             if (!active || !hasPages) {
                 GLES30.glClearColor(0f, 0f, 0f, 0f)
                 GLES30.glClear(GLES30.GL_COLOR_BUFFER_BIT or GLES30.GL_DEPTH_BUFFER_BIT)
