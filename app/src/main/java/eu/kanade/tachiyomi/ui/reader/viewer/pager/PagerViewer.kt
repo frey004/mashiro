@@ -4,8 +4,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Picture
 import android.graphics.PointF
 import android.graphics.RectF
+import android.os.Build
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -256,7 +258,13 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             curlTarget = target
             // Izquierda a derecha avanza hacia +1; derecha a izquierda hacia -1
             curlForward = (target == 1) != (this is R2LPagerViewer)
-            if (curlForward) view.begin(turning = current, under = other) else view.begin(turning = other, under = current)
+            // En doble página la hoja es media pantalla y gira sobre el lomo del centro
+            val spread = config.doublePages
+            if (curlForward) {
+                view.begin(turning = current, under = other, spread = spread)
+            } else {
+                view.begin(turning = other, under = current, spread = spread)
+            }
         }
         val progress = if (target == 1) offset else 1f - offset
         view.setProgress(if (curlForward) progress else 1f - progress)
@@ -299,13 +307,24 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             ?: return null
         if (holder.width == 0 || holder.height == 0) return null
         val scale = min(1f, 1080f / holder.width)
-        val bitmap = Bitmap.createBitmap(
-            (holder.width * scale).toInt(),
-            (holder.height * scale).toInt(),
-            Bitmap.Config.ARGB_8888,
-        )
+        val width = (holder.width * scale).toInt()
+        val height = (holder.height * scale).toInt()
+        val background = activity.readerBackgroundColor(config.theme)
+        // Las páginas usan bitmaps de hardware, que un Canvas normal no puede copiar (salían en
+        // negro): se graba el dibujo y se renderiza con aceleración por hardware
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val picture = Picture()
+            picture.beginRecording(holder.width, holder.height).apply {
+                drawColor(background)
+                holder.draw(this)
+            }
+            picture.endRecording()
+            return runCatching { Bitmap.createBitmap(picture, width, height, Bitmap.Config.ARGB_8888) }
+                .getOrNull()
+        }
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         Canvas(bitmap).apply {
-            drawColor(activity.readerBackgroundColor(config.theme))
+            drawColor(background)
             scale(scale, scale)
             holder.draw(this)
         }
