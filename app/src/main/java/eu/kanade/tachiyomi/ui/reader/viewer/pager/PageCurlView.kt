@@ -216,8 +216,8 @@ class PageCurlView(
 
         fun setPages(turning: Bitmap, turningRect: RectF, under: Bitmap, underRect: RectF, spread: Boolean) {
             this.spread = spread
-            topRect = turningRect
-            underRect = underRect
+            this.topRect = turningRect
+            this.underRect = underRect
             if (turningTex == 0) {
                 val ids = IntArray(2)
                 GLES30.glGenTextures(2, ids, 0)
