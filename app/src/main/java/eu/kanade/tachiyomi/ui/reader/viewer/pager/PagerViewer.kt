@@ -43,6 +43,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mihon.app.di.appGraph
 import tachiyomi.core.common.util.system.logcat
+import java.util.Collections
+import java.util.WeakHashMap
 import kotlin.math.min
 
 /**
@@ -262,10 +264,12 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             curlForward = (target == 1) != (this is R2LPagerViewer)
             // En doble página la hoja es media pantalla y gira sobre el lomo del centro
             val spread = config.doublePages
+            val currentRect = pageRectOf(current)
+            val otherRect = pageRectOf(other)
             if (curlForward) {
-                view.begin(turning = current, under = other, spread = spread)
+                view.begin(current, currentRect, other, otherRect, spread)
             } else {
-                view.begin(turning = other, under = current, spread = spread)
+                view.begin(other, otherRect, current, currentRect, spread)
             }
         }
         val progress = if (target == 1) offset else 1f - offset
@@ -340,6 +344,11 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
      * decodificada de la propia página, colocada como la muestra el lector.
      */
     private val pageImages = HashMap<ReaderPage, Bitmap>()
+
+    /** Dónde queda la página dentro de cada imagen preparada (0..1). */
+    private val pageImageRects: MutableMap<Bitmap, RectF> = Collections.synchronizedMap(WeakHashMap())
+
+    private fun pageRectOf(image: Bitmap): RectF = pageImageRects[image] ?: RectF(0f, 0f, 1f, 1f)
     private val pageImageJobs = HashMap<ReaderPage, Job>()
 
     private fun prepareNearbyPages(position: Int) {
@@ -398,6 +407,12 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
         }
         first.recycle()
         second?.recycle()
+        pageImageRects[out] = RectF(
+            startX / width,
+            top / height,
+            (startX + leftW + rightW) / width,
+            (top + drawH) / height,
+        )
         return out
     }
 

@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.RectF
 import android.graphics.SurfaceTexture
 import android.opengl.EGL14
 import android.opengl.EGLConfig
@@ -72,8 +73,8 @@ class PageCurlView(
      * Con [spread] (doble página) gira solo media pantalla sobre el lomo del centro, con la página
      * nueva en el reverso.
      */
-    fun begin(turning: Bitmap, under: Bitmap, spread: Boolean) {
-        glHandler.post { renderer.setPages(turning, under, spread) }
+    fun begin(turning: Bitmap, turningRect: RectF, under: Bitmap, underRect: RectF, spread: Boolean) {
+        glHandler.post { renderer.setPages(turning, turningRect, under, underRect, spread) }
         active = true
         requestRender()
     }
@@ -184,6 +185,21 @@ class PageCurlView(
         private var program = 0
         private var spreadProgram = 0
         private var spread = false
+
+        // Zona de la página dentro de la pantalla (0..1); fuera de ella la hoja no se dibuja
+        private var topRect = RectF(0f, 0f, 1f, 1f)
+        private var underRect = RectF(0f, 0f, 1f, 1f)
+
+        private fun setRects(program: Int) {
+            GLES30.glUniform4f(GLES30.glGetUniformLocation(program, "uTopRect"), topRect.left, topRect.top, topRect.right, topRect.bottom)
+            GLES30.glUniform4f(
+                GLES30.glGetUniformLocation(program, "uUnderRect"),
+                underRect.left,
+                underRect.top,
+                underRect.right,
+                underRect.bottom,
+            )
+        }
         private var spreadMesh: FloatBuffer? = null
         private var spreadVertexCount = 0
         private var turningTex = 0
@@ -198,8 +214,10 @@ class PageCurlView(
         private val view = FloatArray(16)
         private val vp = FloatArray(16)
 
-        fun setPages(turning: Bitmap, under: Bitmap, spread: Boolean) {
+        fun setPages(turning: Bitmap, turningRect: RectF, under: Bitmap, underRect: RectF, spread: Boolean) {
             this.spread = spread
+            topRect = turningRect
+            underRect = underRect
             if (turningTex == 0) {
                 val ids = IntArray(2)
                 GLES30.glGenTextures(2, ids, 0)
@@ -290,6 +308,7 @@ class PageCurlView(
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, underTex)
             GLES30.glUniform1i(loc("uTop"), 0)
             GLES30.glUniform1i(loc("uUnder"), 1)
+            setRects(if (spread) spreadProgram else program)
 
             val buffer = mesh ?: return
             buffer.position(0)
@@ -325,6 +344,7 @@ class PageCurlView(
             GLES30.glBindTexture(GLES30.GL_TEXTURE_2D, underTex)
             GLES30.glUniform1i(loc("uTop"), 0)
             GLES30.glUniform1i(loc("uUnder"), 1)
+            setRects(if (spread) spreadProgram else program)
 
             val buffer = spreadMesh ?: return
             buffer.position(0)
@@ -489,7 +509,11 @@ in vec3 vN; in vec2 vUv; in vec3 vP; in float vTurn; in float vZ;
 uniform sampler2D uTop, uUnder;
 uniform vec3 uEye;
 uniform float uMirror, uT;
+uniform vec4 uTopRect, uUnderRect;
 out vec4 o;
+bool inside(vec2 uv, vec4 r) {
+    return uv.x >= r.x && uv.x <= r.z && uv.y >= r.y && uv.y <= r.w;
+}
 void main() {
     vec3 n = normalize(vN);
     vec3 V = normalize(uEye - vP);
@@ -500,13 +524,18 @@ void main() {
         // un lado sigue mostrando la pareja de antes y el otro ya la de después
         vec2 uv = vUv;
         if (uMirror < 0.0) uv.x = 1.0 - uv.x;
-        col = vZ < 0.0 ? texture(uTop, uv).rgb : texture(uUnder, uv).rgb;
-        // sombra de la hoja levantada, más fuerte junto al lomo
-        col *= 1.0 - 0.3 * sin(3.14159265 * uT) * exp(-abs(vZ) * 0.9);
+        bool before = vZ < 0.0;
+        col = before ? texture(uTop, uv).rgb : texture(uUnder, uv).rgb;
+        // sombra de la hoja levantada, más fuerte junto al lomo y solo sobre la página
+        if (inside(uv, before ? uTopRect : uUnderRect)) {
+            col *= 1.0 - 0.3 * sin(3.14159265 * uT) * exp(-abs(vZ) * 0.9);
+        }
     } else {
         // anverso: la página que se va; reverso: la página nueva que cae al otro lado
         vec2 uv = front ? vUv : vec2(1.0 - vUv.x, vUv.y);
         if (uMirror < 0.0) uv.x = 1.0 - uv.x;
+        // solo se dobla la página, no el fondo de alrededor
+        if (!inside(uv, front ? uTopRect : uUnderRect)) discard;
         vec3 base = front ? texture(uTop, uv).rgb : texture(uUnder, uv).rgb;
         float shade = mix(0.55, 1.0, max(n.y, 0.0));
         vec3 L = normalize(vec3(-0.3, 1.0, 0.4 * uMirror));
@@ -522,7 +551,11 @@ in vec3 vN; in vec2 vUv; in vec3 vP; in float vTurn; in float vS;
 uniform sampler2D uTop, uUnder;
 uniform vec3 uEye, uPaper;
 uniform float uMirror, uR;
+uniform vec4 uTopRect, uUnderRect;
 out vec4 o;
+bool inside(vec2 uv, vec4 r) {
+    return uv.x >= r.x && uv.x <= r.z && uv.y >= r.y && uv.y <= r.w;
+}
 void main() {
     vec3 n = normalize(vN);
     vec3 V = normalize(uEye - vP);
@@ -533,9 +566,11 @@ void main() {
     vec3 col;
     if (vTurn < 0.5) {
         // sombra de la hoja levantada sobre la página de debajo
-        float sh = vS > 0.0 ? 0.45 * exp(-vS / (2.5 * uR)) : 0.0;
+        float sh = vS > 0.0 && inside(uv, uUnderRect) ? 0.45 * exp(-vS / (2.5 * uR)) : 0.0;
         col = texture(uUnder, uv).rgb * (1.0 - sh);
     } else {
+        // solo se dobla la página, no el fondo de alrededor
+        if (!inside(uv, uTopRect)) discard;
         // el reverso es papel con la página transparentándose
         vec3 base = front ? texture(uTop, uv).rgb : mix(uPaper, texture(uTop, uv).rgb, 0.15);
         float shade = mix(0.5, 1.0, max(n.y, 0.0));
