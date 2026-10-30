@@ -35,8 +35,10 @@ import eu.kanade.tachiyomi.util.system.readerBackgroundColor
 import eu.kanade.tachiyomi.widget.ViewPagerAdapter
 import eu.kanade.tachiyomi.source.model.Page
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mihon.app.di.appGraph
@@ -252,8 +254,8 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             return
         }
         if (target != curlTarget) {
-            val current = adapter.items.getOrNull(curlAnchor)?.let(::snapshotOf)
-            val other = adapter.items.getOrNull(curlAnchor + target)?.let(::snapshotOf)
+            val current = adapter.items.getOrNull(curlAnchor)?.let(::pageImageOf)
+            val other = adapter.items.getOrNull(curlAnchor + target)?.let(::pageImageOf)
             if (current == null || other == null) return
             curlTarget = target
             // Izquierda a derecha avanza hacia +1; derecha a izquierda hacia -1
@@ -298,6 +300,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     private companion object {
         const val SHEET_PAGES = 20
         const val SHEET_PAGE_WIDTH = 400
+        const val PAGE_IMAGE_WIDTH = 900
     }
     private var lastPageSnapshot: Bitmap? = null
 
@@ -332,13 +335,98 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
     }
 
     /**
+     * Imágenes ya preparadas de la página actual y las de al lado. El visor de imágenes no se deja
+     * copiar fuera de pantalla (salía en negro), así que la hoja y el libro usan la imagen
+     * decodificada de la propia página, colocada como la muestra el lector.
+     */
+    private val pageImages = HashMap<ReaderPage, Bitmap>()
+    private val pageImageJobs = HashMap<ReaderPage, Job>()
+
+    private fun prepareNearbyPages(position: Int) {
+        if (!useCurl && !config.chapterBookAnimation) return
+        val nearby = (position - 1..position + 1)
+            .mapNotNull { adapter.items.getOrNull(it) as? ReaderPage }
+            .toSet()
+        pageImages.keys.retainAll(nearby)
+        pageImageJobs.filterKeys { it !in nearby }.values.forEach { it.cancel() }
+        pageImageJobs.keys.retainAll(nearby)
+        nearby.forEach { page ->
+            if (page in pageImages || page in pageImageJobs) return@forEach
+            pageImageJobs[page] = scope.launch {
+                val partner = partnerOf(page)
+                page.statusFlow.first { it == Page.State.Ready || it is Page.State.Error }
+                partner?.statusFlow?.first { it == Page.State.Ready || it is Page.State.Error }
+                val image = withContext(Dispatchers.IO) { renderPageImage(page, partner) }
+                if (image != null) pageImages[page] = image
+                pageImageJobs.remove(page)
+            }
+        }
+    }
+
+    /** Imagen de [item] para animarla; las transiciones (solo texto) se copian de su vista. */
+    private fun pageImageOf(item: Any): Bitmap? {
+        if (item !is ReaderPage) return snapshotOf(item)
+        return pageImages[item] ?: renderPageImage(item, partnerOf(item))?.also { pageImages[item] = it }
+    }
+
+    /** La página (y su pareja en doble página) centrada sobre el fondo, del tamaño de la pantalla. */
+    private fun renderPageImage(page: ReaderPage, partner: ReaderPage?): Bitmap? {
+        if (pager.width == 0 || pager.height == 0) return null
+        val width = min(pager.width, PAGE_IMAGE_WIDTH)
+        val height = width * pager.height / pager.width
+        val first = decodePage(page, width) ?: return null
+        val second = partner?.let { decodePage(it, width) }
+        // Derecha a izquierda: la primera página queda a la derecha
+        val (left, right) = when {
+            second == null -> first to null
+            this is R2LPagerViewer -> second to first
+            else -> first to second
+        }
+        val totalWidth = left.width + (right?.width ?: 0) * left.height / (right?.height ?: 1)
+        val fit = min(width / totalWidth.toFloat(), height / left.height.toFloat())
+        val leftW = left.width * fit
+        val drawH = left.height * fit
+        val rightW = right?.let { it.width * drawH / it.height } ?: 0f
+        val startX = (width - leftW - rightW) / 2f
+        val top = (height - drawH) / 2f
+        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+        Canvas(out).apply {
+            drawColor(activity.readerBackgroundColor(config.theme))
+            drawBitmap(left, null, RectF(startX, top, startX + leftW, top + drawH), paint)
+            right?.let { drawBitmap(it, null, RectF(startX + leftW, top, startX + leftW + rightW, top + drawH), paint) }
+        }
+        first.recycle()
+        second?.recycle()
+        return out
+    }
+
+    private fun decodePage(page: ReaderPage, targetWidth: Int): Bitmap? {
+        if (page.status != Page.State.Ready) return null
+        val stream = page.stream ?: return null
+        return runCatching {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            stream().use { BitmapFactory.decodeStream(it, null, bounds) }
+            var sample = 1
+            while (bounds.outWidth > 0 && bounds.outWidth / (sample * 2) >= targetWidth) sample *= 2
+            stream().use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
+                ?: stream().use { input ->
+                    // Formatos que BitmapFactory no lee (AVIF, JXL...)
+                    tachiyomi.decoder.ImageDecoder.newInstance(input)?.let { decoder ->
+                        decoder.decode().also { decoder.recycle() }
+                    }
+                }
+        }.getOrNull()
+    }
+
+    /**
      * Cierra el manga del capítulo terminado y abre otro en el capítulo siguiente. Con
      * [openOnly] solo entra un manga cerrado y se abre en el capítulo actual.
      */
     private fun playChapterBook(previous: Any?, openOnly: Boolean = false) {
         if (bookView != null || !ChapterBookView.isSupported(activity)) return
         endCurl()
-        val shown = if (openOnly) null else previous?.let(::snapshotOf) ?: return
+        val shown = if (openOnly) null else previous?.let(::pageImageOf) ?: return
         val rtl = this is R2LPagerViewer
         val background = activity.readerBackgroundColor(config.theme)
         // Si se venía de la pantalla de transición, al lado queda la última página del capítulo
@@ -364,7 +452,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
                 if (current is ReaderPage && current.status != Page.State.Ready) return@request null
                 if (current is ReaderPage && readyChecks++ < 2) return@request null
                 val next = adapter.items.getOrNull(pager.currentItem + if (rtl) -1 else 1)
-                (current?.let(::snapshotOf) ?: return@request null) to next?.let(::snapshotOf)
+                (current?.let(::pageImageOf) ?: return@request null) to next?.let(::pageImageOf)
             },
             onFinished = {
                 bookView?.let(container::removeView)
@@ -469,6 +557,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
      * Called when a new page (either a [ReaderPage] or [ChapterTransition]) is marked as active
      */
     private fun onPageChange(position: Int) {
+        prepareNearbyPages(position)
         val page = adapter.items.getOrNull(position)
         if (page != null && currentPage != page) {
             val allowPreload = checkAllowPreload(page as? ReaderPage)
@@ -493,7 +582,7 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             val bookEnabled = config.chapterBookAnimation && this !is VerticalPagerViewer
             if (bookEnabled && page is ChapterTransition.Next) {
                 // La última página sigue montada junto a la transición: se guarda para el libro
-                lastPageSnapshot = page.from.pages?.lastOrNull()?.let(::snapshotOf)
+                lastPageSnapshot = page.from.pages?.lastOrNull()?.let(::pageImageOf)
             }
             if (entersNextChapter && bookEnabled) {
                 playChapterBook(previous = currentPage)

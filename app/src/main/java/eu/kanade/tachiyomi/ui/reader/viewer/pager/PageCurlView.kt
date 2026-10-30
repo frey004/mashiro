@@ -208,8 +208,7 @@ class PageCurlView(
             }
             upload(turningTex, turning)
             upload(underTex, under)
-            turning.recycle()
-            under.recycle()
+            // Las imágenes son del lector, que las reutiliza: no se reciclan aquí
             hasPages = true
         }
 
