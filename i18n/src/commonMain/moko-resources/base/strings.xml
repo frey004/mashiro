@@ -416,6 +416,8 @@
     <string name="pref_double_tap_zoom">Double tap to zoom</string>
     <string name="pref_cutout_short">Show content in cutout area</string>
     <string name="pref_page_transitions">Animate page transitions</string>
+    <string name="pref_auto_update_extensions">Update extensions automatically</string>
+    <string name="pref_auto_update_extensions_summary">Download and install extension updates when the app opens</string>
     <string name="pref_double_pages">Double page</string>
     <string name="pref_double_pages_summary">Show two pages side by side (1 and 2, 3 and 4…)</string>
     <string name="pref_page_turn_effect">Page turn effect</string>

@@ -6,6 +6,7 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import eu.kanade.domain.extension.interactor.TrustExtension
 import eu.kanade.domain.source.service.SourcePreferences
+import eu.kanade.domain.base.BasePreferences
 import eu.kanade.tachiyomi.extension.api.ExtensionUpdateNotifier
 import eu.kanade.tachiyomi.extension.model.Extension
 import eu.kanade.tachiyomi.extension.model.InstallStep
@@ -18,6 +19,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -61,6 +63,7 @@ class ExtensionManager(
     private val updateExtensionStores: UpdateExtensionStores,
     private val installer: ExtensionInstaller,
     private val extensionUpdateNotifier: ExtensionUpdateNotifier,
+    private val basePreferences: BasePreferences,
 ) {
 
     private val initialized = CompletableDeferred<Unit>()
@@ -212,11 +215,34 @@ class ExtensionManager(
         initialized.await()
         setAvailableExtensions(extensions)
 
-        val names = (loadedExtensionMapFlow.value.values + notLoadedExtensionMapFlow.value.values)
-            .filter { it.hasUpdate }
-            .map { it.name }
-        if (names.isNotEmpty()) {
-            extensionUpdateNotifier.promptUpdates(names)
+        val loadedUpdates = loadedExtensionMapFlow.value.values.filter { it.hasUpdate }
+        val notLoadedUpdates = notLoadedExtensionMapFlow.value.values.filter { it.hasUpdate }
+
+        // Se actualizan solas las que se pueden instalar sin preguntar: las privadas, o con un
+        // instalador que no pide confirmación por cada apk. Las que no cargan (sin confianza o con
+        // errores) se siguen avisando para que el usuario decida.
+        val silent = preferences.autoUpdateExtensions.get() &&
+            basePreferences.extensionInstaller.get() != BasePreferences.ExtensionInstaller.LEGACY
+        val (automatic, manual) = if (silent) {
+            loadedUpdates to notLoadedUpdates
+        } else {
+            emptyList<Extension.Loaded>() to (loadedUpdates + notLoadedUpdates)
+        }
+
+        if (manual.isNotEmpty()) {
+            extensionUpdateNotifier.promptUpdates(manual.map { it.name })
+        }
+        if (automatic.isNotEmpty()) {
+            // En el ámbito de la app, para que siga aunque se cierre la pantalla que lo pidió
+            scope.launch(Dispatchers.IO) {
+                automatic.forEach { extension ->
+                    try {
+                        updateExtension(extension).collect()
+                    } catch (e: Exception) {
+                        logcat(LogPriority.ERROR, e) { "Auto-update of ${extension.pkgName} failed" }
+                    }
+                }
+            }
         }
     }
 

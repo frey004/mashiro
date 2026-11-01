@@ -65,6 +65,9 @@ class SourcePreferences(
 
     val hideInLibraryItems: Preference<Boolean> = preferenceStore.getBoolean("browse_hide_in_library_items", false)
 
+    /** Descargar e instalar solas las actualizaciones de extensiones al abrir la app. */
+    val autoUpdateExtensions: Preference<Boolean> = preferenceStore.getBoolean("auto_update_extensions", true)
+
     val extensionRepos: Preference<Set<String>> = preferenceStore.getStringSet("extension_repos", emptySet())
 
     val extensionUpdatesCount: Preference<Int> = preferenceStore.getInt("ext_updates_count", 0)
