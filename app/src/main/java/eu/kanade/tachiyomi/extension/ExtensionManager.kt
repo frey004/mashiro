@@ -42,6 +42,7 @@ import mihon.domain.extension.model.ExtensionStore
 import mihon.domain.extension.repository.ExtensionStoreRepository
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.source.model.StubSource
+import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import java.util.Locale
 
@@ -197,6 +198,7 @@ class ExtensionManager(
         }
 
         setAvailableExtensions(extensions)
+        autoUpdateExtensions()
     }
 
     /**
@@ -204,8 +206,13 @@ class ExtensionManager(
      * installed extensions that have an update. Stays silent when the stores can't be reached.
      */
     suspend fun checkForUpdates() {
-        val extensions = try {
+        // Aunque no se pueda refrescar la lista de repositorios, se buscan actualizaciones con la que hay
+        try {
             updateExtensionStores()
+        } catch (e: Exception) {
+            logcat(LogPriority.ERROR, e)
+        }
+        val extensions = try {
             fetchExtensions()
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
@@ -215,35 +222,48 @@ class ExtensionManager(
         initialized.await()
         setAvailableExtensions(extensions)
 
-        val loadedUpdates = loadedExtensionMapFlow.value.values.filter { it.hasUpdate }
-        val notLoadedUpdates = notLoadedExtensionMapFlow.value.values.filter { it.hasUpdate }
-
-        // Se actualizan solas las que se pueden instalar sin preguntar: las privadas, o con un
-        // instalador que no pide confirmación por cada apk. Las que no cargan (sin confianza o con
-        // errores) se siguen avisando para que el usuario decida.
-        val silent = preferences.autoUpdateExtensions.get() &&
-            basePreferences.extensionInstaller.get() != BasePreferences.ExtensionInstaller.LEGACY
-        val (automatic, manual) = if (silent) {
-            loadedUpdates to notLoadedUpdates
-        } else {
-            emptyList<Extension.Loaded>() to (loadedUpdates + notLoadedUpdates)
-        }
-
+        val manual = autoUpdateExtensions()
         if (manual.isNotEmpty()) {
             extensionUpdateNotifier.promptUpdates(manual.map { it.name })
         }
-        if (automatic.isNotEmpty()) {
+    }
+
+    // Paquetes que se están actualizando solos, para no repetirlos si la lista se recarga mientras
+    private val autoUpdating = mutableSetOf<String>()
+
+    /**
+     * Descarga e instala solas las actualizaciones que se pueden instalar sin preguntar (las
+     * privadas, o con un instalador que no pide confirmación por cada apk). Devuelve las que quedan
+     * para que el usuario decida: las que no cargan (sin confianza o con errores) o todas si está
+     * desactivado.
+     */
+    private suspend fun autoUpdateExtensions(): List<Extension.Installed> {
+        initialized.await()
+        val loadedUpdates = loadedExtensionMapFlow.value.values.filter { it.hasUpdate }
+        val notLoadedUpdates = notLoadedExtensionMapFlow.value.values.filter { it.hasUpdate }
+        val silent = preferences.autoUpdateExtensions.get() &&
+            basePreferences.extensionInstaller.get() != BasePreferences.ExtensionInstaller.LEGACY
+        if (!silent) return loadedUpdates + notLoadedUpdates
+
+        val toUpdate = synchronized(autoUpdating) { loadedUpdates.filter { autoUpdating.add(it.pkgName) } }
+        if (toUpdate.isNotEmpty()) {
+            withContext(Dispatchers.Main) {
+                context.toast(context.stringResource(MR.strings.ext_auto_updating, toUpdate.size))
+            }
             // En el ámbito de la app, para que siga aunque se cierre la pantalla que lo pidió
             scope.launch(Dispatchers.IO) {
-                automatic.forEach { extension ->
+                toUpdate.forEach { extension ->
                     try {
                         updateExtension(extension).collect()
                     } catch (e: Exception) {
                         logcat(LogPriority.ERROR, e) { "Auto-update of ${extension.pkgName} failed" }
+                    } finally {
+                        synchronized(autoUpdating) { autoUpdating.remove(extension.pkgName) }
                     }
                 }
             }
         }
+        return notLoadedUpdates
     }
 
     private suspend fun fetchExtensions(): List<Extension.Available> {

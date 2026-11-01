@@ -58,6 +58,7 @@
     <string name="pref_auto_update_manga_sync">Actualizar progreso al terminar un capítulo</string>
     <string name="pref_fullscreen">Pantalla completa</string>
     <string name="pref_page_transitions">Transiciones de página animadas</string>
+    <string name="ext_auto_updating">Actualizando %1$d extensiones…</string>
     <string name="pref_auto_update_extensions">Actualizar extensiones automáticamente</string>
     <string name="pref_auto_update_extensions_summary">Descarga e instala las actualizaciones de extensiones al abrir la app</string>
     <string name="pref_double_pages">Doble página</string>
