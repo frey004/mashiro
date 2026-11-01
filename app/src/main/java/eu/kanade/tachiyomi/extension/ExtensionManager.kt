@@ -6,7 +6,6 @@ import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import eu.kanade.domain.extension.interactor.TrustExtension
 import eu.kanade.domain.source.service.SourcePreferences
-import eu.kanade.domain.base.BasePreferences
 import eu.kanade.tachiyomi.extension.api.ExtensionUpdateNotifier
 import eu.kanade.tachiyomi.extension.model.Extension
 import eu.kanade.tachiyomi.extension.model.InstallStep
@@ -19,7 +18,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -42,7 +40,6 @@ import mihon.domain.extension.model.ExtensionStore
 import mihon.domain.extension.repository.ExtensionStoreRepository
 import tachiyomi.core.common.util.system.logcat
 import tachiyomi.domain.source.model.StubSource
-import tachiyomi.core.common.i18n.stringResource
 import tachiyomi.i18n.MR
 import java.util.Locale
 
@@ -64,7 +61,6 @@ class ExtensionManager(
     private val updateExtensionStores: UpdateExtensionStores,
     private val installer: ExtensionInstaller,
     private val extensionUpdateNotifier: ExtensionUpdateNotifier,
-    private val basePreferences: BasePreferences,
 ) {
 
     private val initialized = CompletableDeferred<Unit>()
@@ -198,7 +194,6 @@ class ExtensionManager(
         }
 
         setAvailableExtensions(extensions)
-        autoUpdateExtensions()
     }
 
     /**
@@ -206,13 +201,8 @@ class ExtensionManager(
      * installed extensions that have an update. Stays silent when the stores can't be reached.
      */
     suspend fun checkForUpdates() {
-        // Aunque no se pueda refrescar la lista de repositorios, se buscan actualizaciones con la que hay
-        try {
-            updateExtensionStores()
-        } catch (e: Exception) {
-            logcat(LogPriority.ERROR, e)
-        }
         val extensions = try {
+            updateExtensionStores()
             fetchExtensions()
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
@@ -222,48 +212,12 @@ class ExtensionManager(
         initialized.await()
         setAvailableExtensions(extensions)
 
-        val manual = autoUpdateExtensions()
-        if (manual.isNotEmpty()) {
-            extensionUpdateNotifier.promptUpdates(manual.map { it.name })
+        val names = (loadedExtensionMapFlow.value.values + notLoadedExtensionMapFlow.value.values)
+            .filter { it.hasUpdate }
+            .map { it.name }
+        if (names.isNotEmpty()) {
+            extensionUpdateNotifier.promptUpdates(names)
         }
-    }
-
-    // Paquetes que se están actualizando solos, para no repetirlos si la lista se recarga mientras
-    private val autoUpdating = mutableSetOf<String>()
-
-    /**
-     * Descarga e instala solas las actualizaciones que se pueden instalar sin preguntar (las
-     * privadas, o con un instalador que no pide confirmación por cada apk). Devuelve las que quedan
-     * para que el usuario decida: las que no cargan (sin confianza o con errores) o todas si está
-     * desactivado.
-     */
-    private suspend fun autoUpdateExtensions(): List<Extension.Installed> {
-        initialized.await()
-        val loadedUpdates = loadedExtensionMapFlow.value.values.filter { it.hasUpdate }
-        val notLoadedUpdates = notLoadedExtensionMapFlow.value.values.filter { it.hasUpdate }
-        val silent = preferences.autoUpdateExtensions.get() &&
-            basePreferences.extensionInstaller.get() != BasePreferences.ExtensionInstaller.LEGACY
-        if (!silent) return loadedUpdates + notLoadedUpdates
-
-        val toUpdate = synchronized(autoUpdating) { loadedUpdates.filter { autoUpdating.add(it.pkgName) } }
-        if (toUpdate.isNotEmpty()) {
-            withContext(Dispatchers.Main) {
-                context.toast(context.stringResource(MR.strings.ext_auto_updating, toUpdate.size))
-            }
-            // En el ámbito de la app, para que siga aunque se cierre la pantalla que lo pidió
-            scope.launch(Dispatchers.IO) {
-                toUpdate.forEach { extension ->
-                    try {
-                        updateExtension(extension).collect()
-                    } catch (e: Exception) {
-                        logcat(LogPriority.ERROR, e) { "Auto-update of ${extension.pkgName} failed" }
-                    } finally {
-                        synchronized(autoUpdating) { autoUpdating.remove(extension.pkgName) }
-                    }
-                }
-            }
-        }
-        return notLoadedUpdates
     }
 
     private suspend fun fetchExtensions(): List<Extension.Available> {

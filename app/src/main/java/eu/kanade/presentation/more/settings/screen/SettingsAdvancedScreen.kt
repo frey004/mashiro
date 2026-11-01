@@ -448,11 +448,6 @@ object SettingsAdvancedScreen : SearchableSettings {
                         }
                     },
                 ),
-                Preference.PreferenceItem.SwitchPreference(
-                    preference = remember { context.appGraph.sourcePreferences.autoUpdateExtensions },
-                    title = stringResource(MR.strings.pref_auto_update_extensions),
-                    subtitle = stringResource(MR.strings.pref_auto_update_extensions_summary),
-                ),
                 Preference.PreferenceItem.TextPreference(
                     title = stringResource(MR.strings.ext_revoke_trust),
                     onClick = { trustExtension.revokeAll() },
