@@ -8,115 +8,124 @@
 <link rel="icon" href="img/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@700&family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@900&display=swap">
 <style>
-/* Paleta de comando: verde de uniforme, rojo de boina, dorado de trenza y azul marino */
+/* Página de webtoon: papel blanco, viñetas de tinta, morado de pelo, verde lima de corbata,
+   azul acero de mangas, traje negro con raya diplomática y gris de armadura */
 :root {
-  --night: #0b1220;
-  --night-2: #121b2e;
-  --green: #2f8f4e;
-  --green-deep: #1d5c34;
-  --red: #d7263d;
-  --red-deep: #9e1a2c;
-  --gold: #f2c45a;
-  --ink: #f4f6fb;
-  --muted: #a9b3c7;
-  --line: rgba(244, 246, 251, .12);
-  --f-display: "Anton", "Arial Black", Impact, sans-serif;
+  --paper: #fbfaf7;
+  --ink: #111015;
+  --muted: #55525e;
+  --purple: #6d2bd9;
+  --violet-glow: #b46cff;
+  --lime: #9be22d;
+  --steel: #4f7fd1;
+  --steel-deep: #2c4f99;
+  --f-sfx: "Bangers", "Impact", sans-serif;
+  --f-caption: "Comic Neue", "Comic Sans MS", system-ui, sans-serif;
   --f-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-jp: "Noto Sans JP", "Hiragino Sans", sans-serif;
 }
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; scroll-padding-top: 76px; }
-body {
-  margin: 0; background: var(--night); color: var(--ink);
-  font: 16px/1.6 var(--f-body);
-  background-image:
-    radial-gradient(1200px 600px at 85% -10%, rgba(215, 38, 61, .22), transparent 60%),
-    radial-gradient(900px 500px at -10% 30%, rgba(47, 143, 78, .20), transparent 60%),
-    repeating-linear-gradient(115deg, rgba(255,255,255,.025) 0 2px, transparent 2px 22px);
-}
-a { color: var(--gold); }
+html { scroll-behavior: smooth; scroll-padding-top: 74px; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 var(--f-body); }
+a { color: var(--purple); font-weight: 600; }
 img { max-width: 100%; display: block; }
 
-/* Barra superior como marcador de combate */
+/* Cabecera: traje negro con raya diplomática y la barra que se llena al bajar */
 .hud {
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; gap: 14px;
-  padding: 10px max(16px, calc((100vw - 1100px) / 2));
-  background: rgba(11, 18, 32, .86); backdrop-filter: blur(10px);
-  border-bottom: 2px solid var(--red);
+  padding: 10px max(16px, calc((100vw - 1060px) / 2));
+  background: var(--ink) repeating-linear-gradient(90deg, transparent 0 13px, rgba(255,255,255,.07) 13px 14px);
+  border-bottom: 4px solid var(--lime);
 }
-.hud .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
-.hud .brand img { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--gold); }
+.hud .brand { display: flex; align-items: center; gap: 10px; color: #fff; text-decoration: none; }
+.hud .brand img { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--lime); }
 .hud .brand b { font: 900 22px var(--f-jp); }
-.bar { flex: 1; height: 12px; border: 2px solid var(--gold); transform: skewX(-20deg); background: var(--night-2); overflow: hidden; }
+.bar { flex: 1; height: 12px; border: 2px solid #fff; border-radius: 2px; background: #2a2730; overflow: hidden; }
 /* Se llena según lo que se ha bajado en la página */
-.bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green), #6fd38b); transition: width .12s linear; }
+.bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--purple), var(--violet-glow)); box-shadow: 0 0 10px var(--violet-glow); transition: width .12s linear; }
 .hud nav { display: flex; gap: 18px; }
-.hud nav a { color: var(--ink); text-decoration: none; font: 15px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
-.hud nav a:hover { color: var(--gold); }
+.hud nav a { color: #fff; text-decoration: none; font: 20px var(--f-sfx); letter-spacing: .06em; }
+.hud nav a:hover { color: var(--lime); }
 @media (max-width: 760px) { .hud nav { display: none; } }
 
-main { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+main { max-width: 1060px; margin: 0 auto; padding: 30px 16px 0; }
 
-/* Portada */
-.hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 24px; align-items: center; padding: 56px 0 40px; }
-.tag { display: inline-block; font: 15px var(--f-display); letter-spacing: .12em; color: var(--night); background: var(--gold); padding: 4px 14px; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
-.hero h1 { margin: 14px 0 6px; font: 900 clamp(64px, 12vw, 128px)/1 var(--f-jp); letter-spacing: .02em;
-  text-shadow: 4px 4px 0 var(--red-deep), 8px 8px 0 rgba(0,0,0,.35); }
-.hero .sub { font: clamp(26px, 4vw, 40px)/1.1 var(--f-display); text-transform: uppercase; color: var(--gold); margin: 0 0 14px; }
-.hero p.lead { color: var(--muted); max-width: 520px; margin: 0 0 26px; }
+/* Viñetas de tinta */
+.panel { position: relative; background: #fff; border: 4px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); margin: 0 0 40px; padding: 30px 28px 28px; }
+.caption { display: inline-block; font: 700 15px/1.25 var(--f-caption); text-transform: uppercase; letter-spacing: .04em; text-align: center; background: #fff; color: var(--ink); border: 2px solid var(--ink); border-radius: 10px; padding: 8px 14px; }
+.panel > .caption { position: absolute; top: -22px; right: 18px; }
+h2 { font: clamp(40px, 6vw, 60px)/1 var(--f-sfx); letter-spacing: .03em; margin: 0 0 18px; color: var(--purple); text-shadow: 3px 3px 0 var(--ink); }
+h3 { font: 26px/1.05 var(--f-sfx); letter-spacing: .04em; margin: 0 0 6px; color: var(--steel-deep); }
+p { margin: 0 0 10px; }
+
+/* Portada: viñeta grande con líneas de velocidad y el personaje */
+.hero { display: grid; grid-template-columns: 1.05fr .95fr; padding: 0; overflow: hidden; }
+.hero .copy { padding: 40px 32px 34px; }
+.hero h1 { font: 900 clamp(64px, 11vw, 120px)/1 var(--f-jp); margin: 16px 0 4px; text-shadow: 5px 5px 0 var(--violet-glow); }
+.hero .sub { font: clamp(26px, 4vw, 38px)/1 var(--f-sfx); letter-spacing: .05em; color: var(--steel); margin: 0 0 14px; }
+.hero .lead { color: var(--muted); max-width: 470px; margin: 0 0 24px; }
 .cta { display: flex; flex-wrap: wrap; gap: 14px; }
-.btn { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 20px var(--f-display); letter-spacing: .08em; text-transform: uppercase; padding: 14px 28px; color: var(--ink);
-  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); transition: transform .12s ease, filter .12s ease; }
-.btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
-.btn-red { background: linear-gradient(135deg, var(--red), var(--red-deep)); }
-.btn-green { background: linear-gradient(135deg, var(--green), var(--green-deep)); }
-.fighter { position: relative; aspect-ratio: 3 / 4; }
-.fighter::before { content: ""; position: absolute; inset: 8% 4% 0; background: linear-gradient(160deg, var(--green), var(--green-deep)); clip-path: polygon(18% 0, 100% 0, 82% 100%, 0 100%); box-shadow: 0 30px 60px rgba(0,0,0,.4); }
-.fighter::after { content: ""; position: absolute; inset: 8% 4% 0; background: repeating-linear-gradient(115deg, transparent 0 18px, rgba(242,196,90,.14) 18px 22px); clip-path: polygon(18% 0, 100% 0, 82% 100%, 0 100%); }
-.fighter img { position: absolute; z-index: 1; left: 50%; bottom: 0; width: 82%; transform: translateX(-50%); filter: drop-shadow(0 16px 24px rgba(0,0,0,.45)); }
-.fighter .react { opacity: 0; animation: react 6s 1.2s infinite; }
-.fighter .read { animation: read 6s 1.2s infinite; }
-.fighter .spark { width: 12%; left: 6%; bottom: 74%; transform: none; opacity: 0; animation: spark 6s 1.2s infinite; }
-@keyframes read { 0%, 45% { opacity: 1 } 48%, 92% { opacity: 0 } 96%, 100% { opacity: 1 } }
-@keyframes react { 0%, 45% { opacity: 0 } 48% { opacity: 1; transform: translateX(-50%) translateY(-6%) } 54%, 92% { opacity: 1; transform: translateX(-50%) } 96%, 100% { opacity: 0 } }
+.btn { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font: 24px var(--f-sfx); letter-spacing: .06em; padding: 10px 24px; border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink); color: #fff; transition: transform .1s ease, box-shadow .1s ease; }
+.btn:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 var(--ink); }
+.btn:active { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--ink); }
+.btn-main { background: var(--purple); }
+.btn-alt { background: var(--lime); color: var(--ink); }
+.stage { position: relative; min-height: 420px; border-left: 4px solid var(--ink); overflow: hidden;
+  background:
+    repeating-conic-gradient(from 0deg at 50% 62%, rgba(17,16,21,.10) 0 1.2deg, transparent 1.2deg 6deg),
+    radial-gradient(circle at 50% 62%, #f1e6ff 0 30%, #fff 62%); }
+.stage img { position: absolute; left: 50%; bottom: 0; width: 70%; transform: translateX(-50%); }
+.stage .react { opacity: 0; animation: react 6s 1.2s infinite; }
+.stage .read { animation: read 6s 1.2s infinite; }
+.stage .spark { width: 13%; left: 15%; bottom: 72%; transform: none; opacity: 0; animation: spark 6s 1.2s infinite; }
+.sfx { position: absolute; z-index: 1; font: 64px/1 var(--f-sfx); color: var(--lime); -webkit-text-stroke: 3px var(--ink); paint-order: stroke; transform: rotate(-12deg); }
+.sfx.a { top: 18px; right: 18px; }
+.sfx.b { bottom: 14px; left: 14px; font-size: 48px; color: var(--violet-glow); opacity: 0; animation: pop 6s 1.2s infinite; }
+@keyframes read { 0%, 46% { opacity: 1 } 46.5%, 93% { opacity: 0 } 93.5%, 100% { opacity: 1 } }
+@keyframes react { 0%, 46% { opacity: 0 } 46.5% { opacity: 1; transform: translateX(-50%) translateY(-6%) } 52%, 93% { opacity: 1; transform: translateX(-50%) } 93.5%, 100% { opacity: 0 } }
 @keyframes spark { 0%, 46% { opacity: 0; transform: scale(0) rotate(-40deg) } 52% { opacity: 1; transform: scale(1.2) } 56%, 90% { opacity: 1; transform: scale(1) } 94%, 100% { opacity: 0 } }
-@media (prefers-reduced-motion: reduce) { .fighter .read, .fighter .react, .fighter .spark { animation: none; } }
-@media (max-width: 760px) { .hero { grid-template-columns: 1fr; padding-top: 32px; } .fighter { max-width: 360px; margin: 0 auto; width: 100%; } }
+@keyframes pop { 0%, 46% { opacity: 0; transform: rotate(8deg) scale(.4) } 52%, 90% { opacity: 1; transform: rotate(8deg) scale(1) } 94%, 100% { opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { .stage .read, .stage .react, .stage .spark, .sfx.b { animation: none; } .bar i { transition: none; } }
+@media (max-width: 760px) {
+  .hero { grid-template-columns: 1fr; }
+  .hero .copy { padding: 34px 22px 26px; }
+  .stage { border-left: 0; border-top: 4px solid var(--ink); min-height: 380px; }
+  .panel { padding: 30px 18px 22px; box-shadow: 6px 6px 0 var(--ink); }
+}
 
-/* Secciones con rótulo de ronda */
-section { padding: 48px 0; border-top: 1px solid var(--line); }
-.round { font: 14px var(--f-display); letter-spacing: .3em; color: var(--red); text-transform: uppercase; }
-h2 { font: clamp(34px, 5vw, 52px)/1.05 var(--f-display); text-transform: uppercase; margin: 6px 0 22px; }
-h3 { font: 22px var(--f-display); letter-spacing: .04em; text-transform: uppercase; margin: 0 0 8px; color: var(--gold); }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-.card { position: relative; background: linear-gradient(160deg, var(--night-2), #0e1626); border: 1px solid var(--line); padding: 22px 22px 20px; clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%); }
-.card::before { content: ""; position: absolute; left: 0; top: 0; width: 4px; height: 100%; background: linear-gradient(var(--red), var(--gold)); }
-.card p { margin: 0; color: var(--muted); }
-.card .ico { font-size: 28px; margin-bottom: 8px; }
+/* Guía: tira de viñetas numeradas */
+ol.strip { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+ol.strip li { counter-increment: s; position: relative; border: 3px solid var(--ink); padding: 50px 16px 16px; background: #fff; }
+ol.strip li::before { content: counter(s); position: absolute; top: -3px; left: -3px; width: 42px; height: 42px; display: grid; place-items: center; font: 28px var(--f-sfx); color: #fff; background: var(--ink); }
+ol.strip li:nth-child(odd) { background: repeating-linear-gradient(90deg, #fff 0 13px, #f2f0f5 13px 14px); }
+ol.strip b { display: block; font: 22px/1.1 var(--f-sfx); letter-spacing: .03em; color: var(--purple); margin-bottom: 6px; }
+ol.strip span { color: var(--muted); }
 
-/* Guía paso a paso */
-ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 12px; }
-ol.steps li { counter-increment: s; position: relative; padding: 16px 18px 16px 74px; background: var(--night-2); border: 1px solid var(--line); }
-ol.steps li::before { content: counter(s); position: absolute; left: 0; top: 0; bottom: 0; width: 56px; display: grid; place-items: center; font: 30px var(--f-display); color: var(--night); background: var(--gold); clip-path: polygon(0 0, 100% 0, 80% 100%, 0 100%); }
-ol.steps b { color: var(--ink); }
-ol.steps span { color: var(--muted); }
+/* Viñetas lado a lado, con el color del traje arriba */
+.duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.cell { border: 3px solid var(--ink); border-top-width: 12px; padding: 18px; background: #fff; }
+.cell.steel { border-top-color: var(--steel); }
+.cell.lime { border-top-color: var(--lime); }
+.cell.purple { border-top-color: var(--purple); }
+.cell p { color: var(--muted); margin: 0; }
 
-/* Preguntas */
-details { background: var(--night-2); border: 1px solid var(--line); border-left: 4px solid var(--green); padding: 0 18px; margin-bottom: 10px; }
-details[open] { border-left-color: var(--red); }
-summary { cursor: pointer; padding: 16px 0; font-weight: 800; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
-summary::after { content: "+"; font: 24px var(--f-display); color: var(--gold); }
+/* Problemas: bocadillos que se abren */
+details { border: 3px solid var(--ink); border-radius: 22px; background: #fff; padding: 0 20px; margin-bottom: 14px; }
+details[open] { background: #f6f0ff; }
+summary { cursor: pointer; padding: 14px 0; font: 700 18px var(--f-caption); list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; font: 30px/1 var(--f-sfx); color: var(--purple); }
 details[open] summary::after { content: "−"; }
 details p, details ul { color: var(--muted); margin: 0 0 16px; }
 details li { margin-bottom: 6px; }
 
-.ko { text-align: center; padding: 56px 16px; }
-.ko h2 { font-size: clamp(48px, 9vw, 96px); color: var(--gold); text-shadow: 4px 4px 0 var(--red-deep); margin-bottom: 18px; }
-footer { text-align: center; color: var(--muted); font-size: 14px; padding: 28px 16px 40px; border-top: 2px solid var(--red); }
-footer a { color: var(--ink); }
+/* Cierre: viñeta negra de traje */
+.finale { text-align: center; background: var(--ink) repeating-linear-gradient(90deg, transparent 0 13px, rgba(255,255,255,.07) 13px 14px); color: #fff; }
+.finale h2 { color: var(--lime); font-size: clamp(56px, 10vw, 104px); text-shadow: 4px 4px 0 var(--purple); }
+footer { text-align: center; color: var(--muted); font-size: 14px; padding: 8px 16px 40px; }
 </style>
 </head>
 <body>
@@ -125,58 +134,61 @@ footer a { color: var(--ink); }
   <div class="bar" aria-hidden="true"><i></i></div>
   <nav>
     <a href="#guia">Guía</a>
+    <a href="#problemas">Ayuda</a>
     <a href="#privacidad">Privacidad</a>
   </nav>
 </header>
 
 <main id="inicio">
-  <div class="hero">
-    <div>
-      <span class="tag">Round 1 · Ready?</span>
+  <div class="panel hero">
+    <div class="copy">
+      <span class="caption">ましろ<br>(lector de manga)<br>Episodio 1</span>
       <h1>ましろ</h1>
       <p class="sub">Lector de manga para Android</p>
       <p class="lead">Tu biblioteca, tus extensiones y una forma de leer que se siente como pasar las hojas de un tomo de verdad. Libre, sin anuncios y sin rastreo.</p>
       <div class="cta">
-        <a class="btn btn-red" href="https://github.com/frey004/mashiro/releases/latest">⬇ Descargar</a>
-        <a class="btn btn-green" href="https://github.com/frey004/mashiro">GitHub</a>
+        <a class="btn btn-main" href="https://github.com/frey004/mashiro/releases/latest">⬇ Descargar</a>
+        <a class="btn btn-alt" href="https://github.com/frey004/mashiro">GitHub</a>
       </div>
     </div>
-    <div class="fighter" aria-hidden="true">
+    <div class="stage" aria-hidden="true">
+      <span class="sfx a">PAH!</span>
+      <span class="sfx b">!?</span>
       <img class="read" src="img/intro_reading.webp" alt="">
       <img class="react" src="img/intro_react.webp" alt="">
       <img class="spark" src="img/intro_spark.webp" alt="">
     </div>
   </div>
 
-  <section id="guia">
-    <div class="round">Tutorial</div>
+  <section class="panel" id="guia">
+    <span class="caption">Capítulo 1<br>Primeros pasos</span>
     <h2>Guía de inicio</h2>
-    <ol class="steps">
-      <li><b>Instala ましろ.</b> <span>Descarga <a href="https://github.com/frey004/mashiro/releases/latest">Mashiro-arm64-v8a.apk</a> (casi todos los móviles) o la versión universal si esa no se instala.</span></li>
-      <li><b>Añade un repositorio de extensiones.</b> <span>En Más → Ajustes → Explorar → Repositorios de extensiones, pega el enlace del repositorio que uses.</span></li>
-      <li><b>Instala extensiones.</b> <span>En Explorar → Extensiones elige las fuentes de tu idioma. En Ajustes → Avanzado → Extensiones puedes elegir el instalador <i>Private</i> para que se instalen sin preguntar.</span></li>
-      <li><b>Busca y guarda mangas.</b> <span>Desde Explorar abre una fuente, busca un título y toca “Añadir a la biblioteca”.</span></li>
-      <li><b>Lee.</b> <span>Abre un capítulo; en el menú del lector eliges dirección de lectura, doble página y los efectos de hoja y de libro.</span></li>
+    <ol class="strip">
+      <li><b>Instala ましろ</b> <span>Descarga <a href="https://github.com/frey004/mashiro/releases/latest">Mashiro-arm64-v8a.apk</a> (casi todos los móviles) o la versión universal si esa no se instala.</span></li>
+      <li><b>Añade un repositorio</b> <span>En Más → Ajustes → Explorar → Repositorios de extensiones, pega el enlace del repositorio que uses.</span></li>
+      <li><b>Instala extensiones</b> <span>En Explorar → Extensiones elige las fuentes de tu idioma. Con el instalador <i>Private</i> (Ajustes → Avanzado → Extensiones) se instalan sin preguntar.</span></li>
+      <li><b>Guarda mangas</b> <span>Desde Explorar abre una fuente, busca un título y toca “Añadir a la biblioteca”.</span></li>
+      <li><b>Lee</b> <span>En el menú del lector eliges dirección de lectura, doble página y los efectos de hoja y de libro.</span></li>
     </ol>
   </section>
 
-  <section id="seguimiento">
-    <div class="round">Combo</div>
+  <section class="panel" id="seguimiento">
+    <span class="caption">Capítulo 2<br>Seguimiento</span>
     <h2>Seguimiento</h2>
-    <div class="grid">
-      <div class="card"><h3>Conecta AniList</h3><p>Más → Ajustes → Seguimiento → AniList e inicia sesión. Después, en la biblioteca, “Vincular toda la biblioteca” busca cada manga, también por sus títulos alternativos.</p></div>
-      <div class="card"><h3>Progreso automático</h3><p>Al terminar un capítulo el progreso se envía solo. Si un manga no se encontró, ábrelo, toca Seguimiento y elige el resultado a mano.</p></div>
+    <div class="duo">
+      <div class="cell steel"><h3>Conecta AniList</h3><p>Más → Ajustes → Seguimiento → AniList e inicia sesión. Después, en la biblioteca, “Vincular toda la biblioteca” busca cada manga, también por sus títulos alternativos.</p></div>
+      <div class="cell lime"><h3>Progreso automático</h3><p>Al terminar un capítulo el progreso se envía solo. Si un manga no se encontró, ábrelo, toca Seguimiento y elige el resultado a mano.</p></div>
     </div>
   </section>
 
-  <section id="migracion">
-    <div class="round">Character change</div>
+  <section class="panel" id="migracion">
+    <span class="caption">Capítulo 3<br>Cambio de fuente</span>
     <h2>Migrar de fuente</h2>
-    <p style="color:var(--muted);max-width:760px">Si una fuente deja de funcionar, ve a Explorar → Migrar, elige la fuente antigua y los mangas que quieres mover. ましろ busca cada uno en otra fuente y copia capítulos leídos, categorías y seguimiento.</p>
+    <p style="color:var(--muted);max-width:760px;margin:0">Si una fuente deja de funcionar, ve a Explorar → Migrar, elige la fuente antigua y los mangas que quieres mover. ましろ busca cada uno en otra fuente y copia capítulos leídos, categorías y seguimiento.</p>
   </section>
 
-  <section id="problemas">
-    <div class="round">Continue?</div>
+  <section class="panel" id="problemas">
+    <span class="caption">Capítulo 4<br>¿Algo falla?</span>
     <h2>Solución de problemas</h2>
     <details id="cloudflare"><summary>“Fallo al pasar Cloudflare”</summary>
       <ul><li>Abre la fuente en el WebView (icono del globo), completa la verificación y vuelve.</li>
@@ -193,19 +205,20 @@ footer a { color: var(--ink); }
       <p>Cuéntalo en <a href="https://github.com/frey004/mashiro/issues">GitHub Issues</a> con tu versión de Android y los pasos para repetirlo.</p></details>
   </section>
 
-  <section id="privacidad">
-    <div class="round">Rules</div>
+  <section class="panel" id="privacidad">
+    <span class="caption">Capítulo 5<br>Reglas</span>
     <h2>Privacidad</h2>
-    <div class="grid">
-      <div class="card"><h3>Sin rastreo</h3><p>ましろ se compila sin telemetría ni anuncios. No recoge estadísticas de uso ni datos personales.</p></div>
-      <div class="card"><h3>Todo en tu móvil</h3><p>Tu biblioteca, historial y ajustes se guardan en el teléfono. Las fuentes solo reciben las peticiones necesarias para mostrar los mangas.</p></div>
-      <div class="card"><h3>Servicios que tú eliges</h3><p>Solo si los conectas: AniList recibe tu progreso y Google Drive guarda tus copias en una carpeta privada de tu cuenta.</p></div>
+    <div class="duo">
+      <div class="cell purple"><h3>Sin rastreo</h3><p>ましろ se compila sin telemetría ni anuncios. No recoge estadísticas de uso ni datos personales.</p></div>
+      <div class="cell steel"><h3>Todo en tu móvil</h3><p>Tu biblioteca, historial y ajustes se guardan en el teléfono. Las fuentes solo reciben las peticiones necesarias para mostrar los mangas.</p></div>
+      <div class="cell lime"><h3>Servicios que tú eliges</h3><p>Solo si los conectas: AniList recibe tu progreso y Google Drive guarda tus copias en una carpeta privada de tu cuenta.</p></div>
     </div>
   </section>
 
-  <div class="ko">
-    <h2>K.O.</h2>
-    <a class="btn btn-red" href="https://github.com/frey004/mashiro/releases/latest">⬇ Descargar ましろ</a>
+  <div class="panel finale">
+    <span class="caption">Continuará…</span>
+    <h2>¡A leer!</h2>
+    <a class="btn btn-alt" href="https://github.com/frey004/mashiro/releases/latest">⬇ Descargar ましろ</a>
   </div>
 </main>
 
@@ -213,7 +226,7 @@ footer a { color: var(--ink); }
   ましろ es software libre basado en <a href="https://github.com/mihonapp/mihon">Mihon</a> (Apache 2.0) · <a href="https://github.com/frey004/mashiro">Código en GitHub</a>
 </footer>
 <script>
-  // La barra de vida avanza con el desplazamiento: llena al llegar al final
+  // La barra se llena con el desplazamiento: llena al llegar al final
   const hp = document.querySelector('.bar i');
   const update = () => {
     const max = document.documentElement.scrollHeight - innerHeight;
