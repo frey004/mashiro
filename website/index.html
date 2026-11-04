@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ましろ · Lector de manga</title>
+<meta name="description" content="ましろ: lector de manga para Android con hojas que se doblan, libro en 3D entre capítulos, seguimiento con AniList y copias en Google Drive.">
+<link rel="icon" href="img/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;800&family=Noto+Sans+JP:wght@900&display=swap">
+<style>
+/* Paleta de comando: verde de uniforme, rojo de boina, dorado de trenza y azul marino */
+:root {
+  --night: #0b1220;
+  --night-2: #121b2e;
+  --green: #2f8f4e;
+  --green-deep: #1d5c34;
+  --red: #d7263d;
+  --red-deep: #9e1a2c;
+  --gold: #f2c45a;
+  --ink: #f4f6fb;
+  --muted: #a9b3c7;
+  --line: rgba(244, 246, 251, .12);
+  --f-display: "Anton", "Arial Black", Impact, sans-serif;
+  --f-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-jp: "Noto Sans JP", "Hiragino Sans", sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+body {
+  margin: 0; background: var(--night); color: var(--ink);
+  font: 16px/1.6 var(--f-body);
+  background-image:
+    radial-gradient(1200px 600px at 85% -10%, rgba(215, 38, 61, .22), transparent 60%),
+    radial-gradient(900px 500px at -10% 30%, rgba(47, 143, 78, .20), transparent 60%),
+    repeating-linear-gradient(115deg, rgba(255,255,255,.025) 0 2px, transparent 2px 22px);
+}
+a { color: var(--gold); }
+img { max-width: 100%; display: block; }
+
+/* Barra superior como marcador de combate */
+.hud {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px max(16px, calc((100vw - 1100px) / 2));
+  background: rgba(11, 18, 32, .86); backdrop-filter: blur(10px);
+  border-bottom: 2px solid var(--red);
+}
+.hud .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+.hud .brand img { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--gold); }
+.hud .brand b { font: 900 22px var(--f-jp); }
+.bar { flex: 1; height: 12px; border: 2px solid var(--gold); transform: skewX(-20deg); background: var(--night-2); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--green), #6fd38b); animation: hp 2.4s ease-out both; }
+@keyframes hp { from { width: 0 } }
+.hud nav { display: flex; gap: 18px; }
+.hud nav a { color: var(--ink); text-decoration: none; font: 15px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
+.hud nav a:hover { color: var(--gold); }
+@media (max-width: 760px) { .hud nav { display: none; } }
+
+main { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
+
+/* Portada */
+.hero { display: grid; grid-template-columns: 1.1fr .9fr; gap: 24px; align-items: center; padding: 56px 0 40px; }
+.tag { display: inline-block; font: 15px var(--f-display); letter-spacing: .12em; color: var(--night); background: var(--gold); padding: 4px 14px; clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+.hero h1 { margin: 14px 0 6px; font: 900 clamp(64px, 12vw, 128px)/1 var(--f-jp); letter-spacing: .02em;
+  text-shadow: 4px 4px 0 var(--red-deep), 8px 8px 0 rgba(0,0,0,.35); }
+.hero .sub { font: clamp(26px, 4vw, 40px)/1.1 var(--f-display); text-transform: uppercase; color: var(--gold); margin: 0 0 14px; }
+.hero p.lead { color: var(--muted); max-width: 520px; margin: 0 0 26px; }
+.cta { display: flex; flex-wrap: wrap; gap: 14px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; font: 20px var(--f-display); letter-spacing: .08em; text-transform: uppercase; padding: 14px 28px; color: var(--ink);
+  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%); transition: transform .12s ease, filter .12s ease; }
+.btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
+.btn-red { background: linear-gradient(135deg, var(--red), var(--red-deep)); }
+.btn-green { background: linear-gradient(135deg, var(--green), var(--green-deep)); }
+.fighter { position: relative; aspect-ratio: 3 / 4; }
+.fighter::before { content: ""; position: absolute; inset: 8% 4% 0; background: linear-gradient(160deg, var(--green), var(--green-deep)); clip-path: polygon(18% 0, 100% 0, 82% 100%, 0 100%); box-shadow: 0 30px 60px rgba(0,0,0,.4); }
+.fighter::after { content: ""; position: absolute; inset: 8% 4% 0; background: repeating-linear-gradient(115deg, transparent 0 18px, rgba(242,196,90,.14) 18px 22px); clip-path: polygon(18% 0, 100% 0, 82% 100%, 0 100%); }
+.fighter img { position: absolute; z-index: 1; left: 50%; bottom: 0; width: 82%; transform: translateX(-50%); filter: drop-shadow(0 16px 24px rgba(0,0,0,.45)); }
+.fighter .react { opacity: 0; animation: react 6s 1.2s infinite; }
+.fighter .read { animation: read 6s 1.2s infinite; }
+.fighter .spark { width: 12%; left: 6%; bottom: 74%; transform: none; opacity: 0; animation: spark 6s 1.2s infinite; }
+@keyframes read { 0%, 45% { opacity: 1 } 48%, 92% { opacity: 0 } 96%, 100% { opacity: 1 } }
+@keyframes react { 0%, 45% { opacity: 0 } 48% { opacity: 1; transform: translateX(-50%) translateY(-6%) } 54%, 92% { opacity: 1; transform: translateX(-50%) } 96%, 100% { opacity: 0 } }
+@keyframes spark { 0%, 46% { opacity: 0; transform: scale(0) rotate(-40deg) } 52% { opacity: 1; transform: scale(1.2) } 56%, 90% { opacity: 1; transform: scale(1) } 94%, 100% { opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { .fighter .read, .fighter .react, .fighter .spark, .bar i { animation: none; } }
+@media (max-width: 760px) { .hero { grid-template-columns: 1fr; padding-top: 32px; } .fighter { max-width: 360px; margin: 0 auto; width: 100%; } }
+
+/* Secciones con rótulo de ronda */
+section { padding: 48px 0; border-top: 1px solid var(--line); }
+.round { font: 14px var(--f-display); letter-spacing: .3em; color: var(--red); text-transform: uppercase; }
+h2 { font: clamp(34px, 5vw, 52px)/1.05 var(--f-display); text-transform: uppercase; margin: 6px 0 22px; }
+h3 { font: 22px var(--f-display); letter-spacing: .04em; text-transform: uppercase; margin: 0 0 8px; color: var(--gold); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.card { position: relative; background: linear-gradient(160deg, var(--night-2), #0e1626); border: 1px solid var(--line); padding: 22px 22px 20px; clip-path: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%); }
+.card::before { content: ""; position: absolute; left: 0; top: 0; width: 4px; height: 100%; background: linear-gradient(var(--red), var(--gold)); }
+.card p { margin: 0; color: var(--muted); }
+.card .ico { font-size: 28px; margin-bottom: 8px; }
+
+/* Guía paso a paso */
+ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; display: grid; gap: 12px; }
+ol.steps li { counter-increment: s; position: relative; padding: 16px 18px 16px 74px; background: var(--night-2); border: 1px solid var(--line); }
+ol.steps li::before { content: counter(s); position: absolute; left: 0; top: 0; bottom: 0; width: 56px; display: grid; place-items: center; font: 30px var(--f-display); color: var(--night); background: var(--gold); clip-path: polygon(0 0, 100% 0, 80% 100%, 0 100%); }
+ol.steps b { color: var(--ink); }
+ol.steps span { color: var(--muted); }
+
+/* Preguntas */
+details { background: var(--night-2); border: 1px solid var(--line); border-left: 4px solid var(--green); padding: 0 18px; margin-bottom: 10px; }
+details[open] { border-left-color: var(--red); }
+summary { cursor: pointer; padding: 16px 0; font-weight: 800; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+summary::after { content: "+"; font: 24px var(--f-display); color: var(--gold); }
+details[open] summary::after { content: "−"; }
+details p, details ul { color: var(--muted); margin: 0 0 16px; }
+details li { margin-bottom: 6px; }
+
+.ko { text-align: center; padding: 56px 16px; }
+.ko h2 { font-size: clamp(48px, 9vw, 96px); color: var(--gold); text-shadow: 4px 4px 0 var(--red-deep); margin-bottom: 18px; }
+footer { text-align: center; color: var(--muted); font-size: 14px; padding: 28px 16px 40px; border-top: 2px solid var(--red); }
+footer a { color: var(--ink); }
+</style>
+</head>
+<body>
+<header class="hud">
+  <a class="brand" href="#inicio"><img src="img/logo.png" alt=""><b>ましろ</b></a>
+  <div class="bar" aria-hidden="true"><i></i></div>
+  <nav>
+    <a href="#funciones">Funciones</a>
+    <a href="#guia">Guía</a>
+    <a href="#faq">Preguntas</a>
+    <a href="#privacidad">Privacidad</a>
+  </nav>
+</header>
+
+<main id="inicio">
+  <div class="hero">
+    <div>
+      <span class="tag">Round 1 · Ready?</span>
+      <h1>ましろ</h1>
+      <p class="sub">Lector de manga para Android</p>
+      <p class="lead">Tu biblioteca, tus extensiones y una forma de leer que se siente como pasar las hojas de un tomo de verdad. Libre, sin anuncios y sin rastreo.</p>
+      <div class="cta">
+        <a class="btn btn-red" href="https://github.com/frey004/mashiro/releases/latest">⬇ Descargar</a>
+        <a class="btn btn-green" href="https://github.com/frey004/mashiro">GitHub</a>
+      </div>
+    </div>
+    <div class="fighter" aria-hidden="true">
+      <img class="read" src="img/intro_reading.webp" alt="">
+      <img class="react" src="img/intro_react.webp" alt="">
+      <img class="spark" src="img/intro_spark.webp" alt="">
+    </div>
+  </div>
+
+  <section id="funciones">
+    <div class="round">Move list</div>
+    <h2>Funciones</h2>
+    <div class="grid">
+      <div class="card"><div class="ico">📖</div><h3>Hoja que se dobla</h3><p>Al pasar página, el papel se levanta por la esquina y se enrolla. En doble página gira sobre el lomo como un libro.</p></div>
+      <div class="card"><div class="ico">📚</div><h3>Libro en 3D</h3><p>Entre capítulos el tomo se cierra hoja por hoja y se abre otro en el capítulo siguiente, con la portada del manga.</p></div>
+      <div class="card"><div class="ico">🗂️</div><h3>Capítulos en hojas</h3><p>Ve cada capítulo como un montón de hojas, abre sus páginas en cuadrícula y empieza desde la que quieras.</p></div>
+      <div class="card"><div class="ico">🔗</div><h3>AniList automático</h3><p>Vincula toda tu biblioteca de una vez, incluso con títulos en español, y tu progreso se sincroniza solo.</p></div>
+      <div class="card"><div class="ico">☁️</div><h3>Google Drive</h3><p>Sube copias de seguridad a tu propio Drive y restáuralas en cualquier teléfono.</p></div>
+      <div class="card"><div class="ico">🧩</div><h3>Extensiones</h3><p>Instala fuentes desde repositorios y actualízalas con un toque, sin ventanas si usas el instalador privado.</p></div>
+    </div>
+  </section>
+
+  <section id="guia">
+    <div class="round">Tutorial</div>
+    <h2>Guía de inicio</h2>
+    <ol class="steps">
+      <li><b>Instala ましろ.</b> <span>Descarga <a href="https://github.com/frey004/mashiro/releases/latest">Mashiro-arm64-v8a.apk</a> (casi todos los móviles) o la versión universal si esa no se instala.</span></li>
+      <li><b>Añade un repositorio de extensiones.</b> <span>En Más → Ajustes → Explorar → Repositorios de extensiones, pega el enlace del repositorio que uses.</span></li>
+      <li><b>Instala extensiones.</b> <span>En Explorar → Extensiones elige las fuentes de tu idioma. En Ajustes → Avanzado → Extensiones puedes elegir el instalador <i>Private</i> para que se instalen sin preguntar.</span></li>
+      <li><b>Busca y guarda mangas.</b> <span>Desde Explorar abre una fuente, busca un título y toca “Añadir a la biblioteca”.</span></li>
+      <li><b>Lee.</b> <span>Abre un capítulo; en el menú del lector eliges dirección de lectura, doble página y los efectos de hoja y de libro.</span></li>
+    </ol>
+  </section>
+
+  <section id="seguimiento">
+    <div class="round">Combo</div>
+    <h2>Seguimiento</h2>
+    <div class="grid">
+      <div class="card"><h3>Conecta AniList</h3><p>Más → Ajustes → Seguimiento → AniList e inicia sesión. Después, en la biblioteca, “Vincular toda la biblioteca” busca cada manga, también por sus títulos alternativos.</p></div>
+      <div class="card"><h3>Progreso automático</h3><p>Al terminar un capítulo el progreso se envía solo. Si un manga no se encontró, ábrelo, toca Seguimiento y elige el resultado a mano.</p></div>
+    </div>
+  </section>
+
+  <section id="migracion">
+    <div class="round">Character change</div>
+    <h2>Migrar de fuente</h2>
+    <p style="color:var(--muted);max-width:760px">Si una fuente deja de funcionar, ve a Explorar → Migrar, elige la fuente antigua y los mangas que quieres mover. ましろ busca cada uno en otra fuente y copia capítulos leídos, categorías y seguimiento.</p>
+  </section>
+
+  <section id="faq">
+    <div class="round">Training mode</div>
+    <h2>Preguntas frecuentes</h2>
+    <details id="almacenamiento"><summary>¿Dónde guarda ましろ las descargas y copias?</summary>
+      <p>En la carpeta que eliges al configurar la app (Más → Ajustes → Datos y almacenamiento → Ubicación). Allí están <i>downloads</i>, <i>autobackup</i> y <i>local</i>. Si cambias de carpeta, mueve su contenido a la nueva.</p></details>
+    <details id="actualizaciones-masivas"><summary>¿Por qué avisa de actualizaciones o descargas masivas?</summary>
+      <p>Muchas peticiones seguidas a una misma fuente pueden hacer que el sitio bloquee tu conexión. Reparte las actualizaciones por categorías o deja el intervalo automático en vez de actualizar todo a la vez.</p></details>
+    <details id="proximas"><summary>¿Qué es la pantalla de próximos capítulos?</summary>
+      <p>Muestra cuándo se esperan capítulos nuevos según la frecuencia de publicación de cada manga de tu biblioteca. Es una estimación.</p></details>
+    <details id="actualizar-app"><summary>¿Cómo actualizo la app?</summary>
+      <p>Más → Acerca de → Buscar actualizaciones, o descarga la última versión desde <a href="https://github.com/frey004/mashiro/releases/latest">GitHub</a>. Instálala encima: no pierdes nada.</p></details>
+  </section>
+
+  <section id="problemas">
+    <div class="round">Continue?</div>
+    <h2>Solución de problemas</h2>
+    <details id="cloudflare"><summary>“Fallo al pasar Cloudflare”</summary>
+      <ul><li>Abre la fuente en el WebView (icono del globo), completa la verificación y vuelve.</li>
+      <li>Actualiza el WebView del sistema (Android System WebView o Chrome) desde la tienda.</li>
+      <li>Si sigue fallando, prueba otra red o espera un rato: el sitio puede estar limitando peticiones.</li></ul></details>
+    <details id="no-carga"><summary>Las páginas no cargan o salen en blanco</summary>
+      <ul><li>Refresca la lista de capítulos del manga y vuelve a abrir el capítulo.</li>
+      <li>Actualiza la extensión de esa fuente.</li>
+      <li>Borra la caché de capítulos en Ajustes → Datos y almacenamiento.</li></ul></details>
+    <details id="extensiones"><summary>Las extensiones no se instalan</summary>
+      <ul><li>Prueba el instalador <i>Private</i> en Ajustes → Avanzado → Extensiones: no depende del instalador del sistema.</li>
+      <li>Con Shizuku, ábrelo y toca Iniciar después de cada reinicio del teléfono.</li></ul></details>
+    <details id="reportar"><summary>Encontré un error</summary>
+      <p>Cuéntalo en <a href="https://github.com/frey004/mashiro/issues">GitHub Issues</a> con tu versión de Android y los pasos para repetirlo.</p></details>
+  </section>
+
+  <section id="privacidad">
+    <div class="round">Rules</div>
+    <h2>Privacidad</h2>
+    <div class="grid">
+      <div class="card"><h3>Sin rastreo</h3><p>ましろ se compila sin telemetría ni anuncios. No recoge estadísticas de uso ni datos personales.</p></div>
+      <div class="card"><h3>Todo en tu móvil</h3><p>Tu biblioteca, historial y ajustes se guardan en el teléfono. Las fuentes solo reciben las peticiones necesarias para mostrar los mangas.</p></div>
+      <div class="card"><h3>Servicios que tú eliges</h3><p>Solo si los conectas: AniList recibe tu progreso y Google Drive guarda tus copias en una carpeta privada de tu cuenta.</p></div>
+    </div>
+  </section>
+
+  <div class="ko">
+    <h2>K.O.</h2>
+    <a class="btn btn-red" href="https://github.com/frey004/mashiro/releases/latest">⬇ Descargar ましろ</a>
+  </div>
+</main>
+
+<footer>
+  ましろ es software libre basado en <a href="https://github.com/mihonapp/mihon">Mihon</a> (Apache 2.0) · <a href="https://github.com/frey004/mashiro">Código en GitHub</a>
+</footer>
+</body>
+</html>

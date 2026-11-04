@@ -1,11 +1,10 @@
 package tachiyomi.core.common
 
 object Constants {
-    const val URL_HELP = "https://mihon.app/docs/guides/troubleshooting/"
-    const val URL_HELP_UPCOMING = "https://mihon.app/docs/faq/updates/upcoming"
-    const val URL_DONATE_PATREON = "https://patreon.com/mihon/membership"
-    const val URL_DONATE_OPENCOLLECTIVE = "https://opencollective.com/mihon/contribute"
-    const val URL_DISCORD = "https://discord.gg/mihon"
+    const val URL_WEBSITE = "https://frey004.github.io/mashiro/"
+    const val URL_GITHUB = "https://github.com/frey004/mashiro"
+    const val URL_HELP = "https://frey004.github.io/mashiro/#problemas"
+    const val URL_HELP_UPCOMING = "https://frey004.github.io/mashiro/#proximas"
 
     const val MANGA_EXTRA = "manga"
 

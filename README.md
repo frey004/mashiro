@@ -8,6 +8,8 @@
 
 Descubre y lee manga, webtoons y cómics desde tu móvil.
 
+**[Página web y guía](https://frey004.github.io/mashiro/)**
+
 </div>
 
 ## Descarga
