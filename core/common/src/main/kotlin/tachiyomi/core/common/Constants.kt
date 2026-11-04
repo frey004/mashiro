@@ -4,7 +4,7 @@ object Constants {
     const val URL_WEBSITE = "https://frey004.github.io/mashiro/"
     const val URL_GITHUB = "https://github.com/frey004/mashiro"
     const val URL_HELP = "https://frey004.github.io/mashiro/#problemas"
-    const val URL_HELP_UPCOMING = "https://frey004.github.io/mashiro/#proximas"
+    const val URL_HELP_UPCOMING = "https://frey004.github.io/mashiro/"
 
     const val MANGA_EXTRA = "manga"
 

@@ -84,7 +84,7 @@ import tachiyomi.presentation.core.util.collectAsState
 object SettingsDataScreen : SearchableSettings {
 
     val restorePreferenceKeyString = MR.strings.label_backup
-    const val HELP_URL = "https://frey004.github.io/mashiro/#almacenamiento"
+    const val HELP_URL = "https://frey004.github.io/mashiro/#guia"
 
     @ReadOnlyComposable
     @Composable

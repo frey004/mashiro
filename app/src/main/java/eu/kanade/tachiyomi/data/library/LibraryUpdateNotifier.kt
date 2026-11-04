@@ -391,7 +391,7 @@ class LibraryUpdateNotifier(
 
     companion object {
         const val HELP_WARNING_URL =
-            "https://frey004.github.io/mashiro/#actualizaciones-masivas"
+            "https://frey004.github.io/mashiro/#problemas"
     }
 }
 
