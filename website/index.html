@@ -51,8 +51,8 @@ img { max-width: 100%; display: block; }
 .hud .brand img { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--gold); }
 .hud .brand b { font: 900 22px var(--f-jp); }
 .bar { flex: 1; height: 12px; border: 2px solid var(--gold); transform: skewX(-20deg); background: var(--night-2); overflow: hidden; }
-.bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--green), #6fd38b); animation: hp 2.4s ease-out both; }
-@keyframes hp { from { width: 0 } }
+/* Se llena según lo que se ha bajado en la página */
+.bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green), #6fd38b); transition: width .12s linear; }
 .hud nav { display: flex; gap: 18px; }
 .hud nav a { color: var(--ink); text-decoration: none; font: 15px var(--f-display); letter-spacing: .06em; text-transform: uppercase; }
 .hud nav a:hover { color: var(--gold); }
@@ -83,7 +83,7 @@ main { max-width: 1100px; margin: 0 auto; padding: 0 16px; }
 @keyframes read { 0%, 45% { opacity: 1 } 48%, 92% { opacity: 0 } 96%, 100% { opacity: 1 } }
 @keyframes react { 0%, 45% { opacity: 0 } 48% { opacity: 1; transform: translateX(-50%) translateY(-6%) } 54%, 92% { opacity: 1; transform: translateX(-50%) } 96%, 100% { opacity: 0 } }
 @keyframes spark { 0%, 46% { opacity: 0; transform: scale(0) rotate(-40deg) } 52% { opacity: 1; transform: scale(1.2) } 56%, 90% { opacity: 1; transform: scale(1) } 94%, 100% { opacity: 0 } }
-@media (prefers-reduced-motion: reduce) { .fighter .read, .fighter .react, .fighter .spark, .bar i { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .fighter .read, .fighter .react, .fighter .spark { animation: none; } }
 @media (max-width: 760px) { .hero { grid-template-columns: 1fr; padding-top: 32px; } .fighter { max-width: 360px; margin: 0 auto; width: 100%; } }
 
 /* Secciones con rótulo de ronda */
@@ -124,7 +124,6 @@ footer a { color: var(--ink); }
   <a class="brand" href="#inicio"><img src="img/logo.png" alt=""><b>ましろ</b></a>
   <div class="bar" aria-hidden="true"><i></i></div>
   <nav>
-    <a href="#funciones">Funciones</a>
     <a href="#guia">Guía</a>
     <a href="#faq">Preguntas</a>
     <a href="#privacidad">Privacidad</a>
@@ -149,19 +148,6 @@ footer a { color: var(--ink); }
       <img class="spark" src="img/intro_spark.webp" alt="">
     </div>
   </div>
-
-  <section id="funciones">
-    <div class="round">Move list</div>
-    <h2>Funciones</h2>
-    <div class="grid">
-      <div class="card"><div class="ico">📖</div><h3>Hoja que se dobla</h3><p>Al pasar página, el papel se levanta por la esquina y se enrolla. En doble página gira sobre el lomo como un libro.</p></div>
-      <div class="card"><div class="ico">📚</div><h3>Libro en 3D</h3><p>Entre capítulos el tomo se cierra hoja por hoja y se abre otro en el capítulo siguiente, con la portada del manga.</p></div>
-      <div class="card"><div class="ico">🗂️</div><h3>Capítulos en hojas</h3><p>Ve cada capítulo como un montón de hojas, abre sus páginas en cuadrícula y empieza desde la que quieras.</p></div>
-      <div class="card"><div class="ico">🔗</div><h3>AniList automático</h3><p>Vincula toda tu biblioteca de una vez, incluso con títulos en español, y tu progreso se sincroniza solo.</p></div>
-      <div class="card"><div class="ico">☁️</div><h3>Google Drive</h3><p>Sube copias de seguridad a tu propio Drive y restáuralas en cualquier teléfono.</p></div>
-      <div class="card"><div class="ico">🧩</div><h3>Extensiones</h3><p>Instala fuentes desde repositorios y actualízalas con un toque, sin ventanas si usas el instalador privado.</p></div>
-    </div>
-  </section>
 
   <section id="guia">
     <div class="round">Tutorial</div>
@@ -240,5 +226,16 @@ footer a { color: var(--ink); }
 <footer>
   ましろ es software libre basado en <a href="https://github.com/mihonapp/mihon">Mihon</a> (Apache 2.0) · <a href="https://github.com/frey004/mashiro">Código en GitHub</a>
 </footer>
+<script>
+  // La barra de vida avanza con el desplazamiento: llena al llegar al final
+  const hp = document.querySelector('.bar i');
+  const update = () => {
+    const max = document.documentElement.scrollHeight - innerHeight;
+    hp.style.width = (max > 0 ? Math.min(100, scrollY / max * 100) : 100) + '%';
+  };
+  addEventListener('scroll', update, { passive: true });
+  addEventListener('resize', update);
+  update();
+</script>
 </body>
 </html>
