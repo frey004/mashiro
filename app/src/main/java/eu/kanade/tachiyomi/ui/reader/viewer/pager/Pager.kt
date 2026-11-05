@@ -27,6 +27,9 @@ open class Pager(
      */
     var longTapListener: ((MotionEvent) -> Boolean)? = null
 
+    /** Ve todos los toques antes que el pager (para que la hoja doblada siga al dedo). */
+    var touchObserver: ((MotionEvent) -> Unit)? = null
+
     /**
      * Gesture listener that implements tap and long tap events.
      */
@@ -58,6 +61,7 @@ open class Pager(
      * Dispatches a touch event.
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        touchObserver?.invoke(ev)
         val handled = super.dispatchTouchEvent(ev)
         if (isGestureDetectorEnabled) {
             gestureDetector.onTouchEvent(ev)

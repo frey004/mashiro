@@ -174,6 +174,8 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
 
         config.pageTurnEffectChangedListener = ::applyPageTurnEffect
 
+        pager.touchObserver = ::onCurlTouch
+
         config.doublePagesChangedListener = {
             lastChapters?.let { chapters ->
                 val page = currentPage as? ReaderPage
@@ -266,14 +268,37 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
             val spread = config.doublePages
             val currentRect = pageRectOf(current)
             val otherRect = pageRectOf(other)
+            // Al avanzar en una sola página, la esquina sigue al dedo; al volver o en doble página
+            // la hoja gira con el desplazamiento
             if (curlForward) {
-                view.begin(current, currentRect, other, otherRect, spread)
+                view.begin(current, currentRect, other, otherRect, spread, followFinger = !spread)
             } else {
-                view.begin(other, otherRect, current, currentRect, spread)
+                view.begin(other, otherRect, current, currentRect, spread, followFinger = false)
             }
         }
         val progress = if (target == 1) offset else 1f - offset
         view.setProgress(if (curlForward) progress else 1f - progress)
+    }
+
+    private var curlDownX = 0f
+    private var curlDownY = 0f
+
+    private fun onCurlTouch(event: MotionEvent) {
+        val view = curlView ?: return
+        val width = pager.width.toFloat()
+        val height = pager.height.toFloat()
+        if (width == 0f || height == 0f) return
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                curlDownX = event.x / width
+                curlDownY = event.y / height
+                view.setFinger(curlDownX, curlDownY, curlDownX, curlDownY)
+            }
+            MotionEvent.ACTION_MOVE -> if (event.pointerCount == 1) {
+                view.setFinger(event.x / width, event.y / height, curlDownX, curlDownY)
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL, MotionEvent.ACTION_POINTER_DOWN -> view.releaseFinger()
+        }
     }
 
     private fun endCurl() {

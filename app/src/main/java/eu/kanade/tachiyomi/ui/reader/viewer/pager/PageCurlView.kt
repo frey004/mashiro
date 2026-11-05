@@ -54,6 +54,14 @@ class PageCurlView(
 
     @Volatile private var active = false
 
+    // Dedo sobre la pantalla (0..1): dónde está ahora y dónde empezó
+    @Volatile private var fingerOn = false
+    @Volatile private var fingerU = 0f
+    @Volatile private var fingerV = 0f
+    @Volatile private var downU = 0f
+    @Volatile private var downV = 0f
+    @Volatile private var fingerTop = false
+
     private val drawRunnable = Runnable {
         val state = egl ?: return@Runnable
         renderer.onDrawFrame()
@@ -73,8 +81,15 @@ class PageCurlView(
      * Con [spread] (doble página) gira solo media pantalla sobre el lomo del centro, con la página
      * nueva en el reverso.
      */
-    fun begin(turning: Bitmap, turningRect: RectF, under: Bitmap, underRect: RectF, spread: Boolean) {
-        glHandler.post { renderer.setPages(turning, turningRect, under, underRect, spread) }
+    fun begin(
+        turning: Bitmap,
+        turningRect: RectF,
+        under: Bitmap,
+        underRect: RectF,
+        spread: Boolean,
+        followFinger: Boolean,
+    ) {
+        glHandler.post { renderer.setPages(turning, turningRect, under, underRect, spread, followFinger) }
         active = true
         requestRender()
     }
@@ -82,6 +97,26 @@ class PageCurlView(
     /** 0 = hoja plana, 1 = hoja pasada del todo. */
     fun setProgress(value: Float) {
         progress = value.coerceIn(0f, 1f)
+        requestRender()
+    }
+
+    /**
+     * Posición del dedo (0..1 de la pantalla). La esquina más cercana a donde empezó el toque
+     * ([downU], [downV]) se levanta y se mueve igual que el dedo.
+     */
+    fun setFinger(u: Float, v: Float, downU: Float, downV: Float) {
+        if (!fingerOn) fingerTop = downV < 0.5f
+        this.downU = downU
+        this.downV = downV
+        fingerU = u
+        fingerV = v
+        fingerOn = true
+        requestRender()
+    }
+
+    /** El dedo se levantó: la hoja termina de pasar o vuelve desde donde quedó. */
+    fun releaseFinger() {
+        fingerOn = false
         requestRender()
     }
 
@@ -185,6 +220,11 @@ class PageCurlView(
         private var program = 0
         private var spreadProgram = 0
         private var spread = false
+        private var followFinger = false
+
+        // Último pliegue que marcó el dedo (normal x, normal z, posición) y el avance en ese momento
+        private var lastFold: FloatArray? = null
+        private var lastFoldProgress = 0f
 
         // Zona de la página dentro de la pantalla (0..1); fuera de ella la hoja no se dibuja
         private var topRect = RectF(0f, 0f, 1f, 1f)
@@ -214,8 +254,17 @@ class PageCurlView(
         private val view = FloatArray(16)
         private val vp = FloatArray(16)
 
-        fun setPages(turning: Bitmap, turningRect: RectF, under: Bitmap, underRect: RectF, spread: Boolean) {
+        fun setPages(
+            turning: Bitmap,
+            turningRect: RectF,
+            under: Bitmap,
+            underRect: RectF,
+            spread: Boolean,
+            followFinger: Boolean,
+        ) {
             this.spread = spread
+            this.followFinger = followFinger
+            lastFold = null
             this.topRect = turningRect
             this.underRect = underRect
             if (turningTex == 0) {
@@ -283,15 +332,45 @@ class PageCurlView(
             Matrix.setLookAtM(view, 0, 0f, dist, cz, 0f, 0f, cz, 1f, 0f, 0f)
             Matrix.multiplyMM(vp, 0, proj, 0, view, 0)
 
-            // Pliegue algo inclinado (la esquina va por delante) que se endereza al acabar
-            val radius = pw * RADIUS_FACTOR
-            val phi = TILT * (1f - 0.6f * t)
-            val nx = sin(phi)
-            val nz = cos(phi)
-            val corners = floatArrayOf(-PX * nx, PX * nx, -PX * nx + pw * nz, PX * nx + pw * nz)
-            val pMin = corners.min()
-            val pMax = corners.max()
-            val c = pMax + (pMin - PI.toFloat() * radius / 2f - radius - pMax) * t
+            val fingerFold = if (followFinger && fingerOn) foldFromFinger() else null
+            val released = lastFold
+            val nx: Float
+            val nz: Float
+            val c: Float
+            var radius = pw * RADIUS_FACTOR
+            when {
+                fingerFold != null -> {
+                    // Mientras se arrastra, la esquina va donde la lleva el dedo
+                    nx = fingerFold[0]
+                    nz = fingerFold[1]
+                    c = fingerFold[2]
+                    radius = fingerFold[3]
+                    lastFold = fingerFold
+                    lastFoldProgress = t
+                }
+                followFinger && released != null -> {
+                    // Al soltar, la hoja termina de pasar o vuelve desde donde la dejó el dedo
+                    nx = released[0]
+                    nz = released[1]
+                    radius = released[3]
+                    val (pMin, pMax) = projections(nx, nz)
+                    val cEnd = pMin - PI.toFloat() * radius / 2f - radius
+                    val p0 = lastFoldProgress
+                    c = if (t >= p0) {
+                        released[2] + (cEnd - released[2]) * ((t - p0) / (1f - p0).coerceAtLeast(0.001f))
+                    } else {
+                        released[2] + (pMax - released[2]) * ((p0 - t) / p0.coerceAtLeast(0.001f))
+                    }
+                }
+                else -> {
+                    // Pliegue algo inclinado (la esquina va por delante) que se endereza al acabar
+                    val phi = TILT * (1f - 0.6f * t)
+                    nx = sin(phi)
+                    nz = cos(phi)
+                    val (pMin, pMax) = projections(nx, nz)
+                    c = pMax + (pMin - PI.toFloat() * radius / 2f - radius - pMax) * t
+                }
+            }
 
             GLES30.glUseProgram(program)
             fun loc(name: String) = GLES30.glGetUniformLocation(program, name)
@@ -322,6 +401,36 @@ class PageCurlView(
             GLES30.glVertexAttribPointer(2, 1, GLES30.GL_FLOAT, false, STRIDE * 4, buffer)
             GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, vertexCount)
             (0..2).forEach { GLES30.glDisableVertexAttribArray(it) }
+        }
+
+        /** Proyección mínima y máxima de las esquinas de la página sobre la normal del pliegue. */
+        private fun projections(nx: Float, nz: Float): Pair<Float, Float> {
+            val corners = floatArrayOf(-PX * nx, PX * nx, -PX * nx + pw * nz, PX * nx + pw * nz)
+            return corners.min() to corners.max()
+        }
+
+        /**
+         * Pliegue de papel real: la esquina del borde libre se desplaza igual que el dedo y la hoja
+         * se dobla por la mediatriz entre la esquina y su nueva posición.
+         */
+        private fun foldFromFinger(): FloatArray? {
+            // De la pantalla a la página sin reflejar: z a lo ancho desde el lomo, x hacia arriba
+            fun z(u: Float) = (if (mirror > 0f) u else 1f - u) * pw
+            fun x(v: Float) = PX - v * 2f * PX
+            val cornerX = if (fingerTop) PX else -PX
+            val cornerZ = pw
+            val targetX = cornerX + x(fingerV) - x(downV)
+            val targetZ = cornerZ + z(fingerU) - z(downU)
+            val dx = cornerX - targetX
+            val dz = cornerZ - targetZ
+            val length = kotlin.math.hypot(dx, dz)
+            if (length < 0.01f) return null
+            val nx = dx / length
+            val nz = dz / length
+            val c = (cornerX + targetX) / 2f * nx + (cornerZ + targetZ) / 2f * nz
+            // Rollo más fino cuanto menos se arrastra, para que la esquina llegue hasta el dedo
+            val radius = (length * 0.12f).coerceIn(pw * 0.03f, pw * RADIUS_FACTOR)
+            return floatArrayOf(nx, nz, c, radius)
         }
 
         /** Doble página: la hoja de un lado gira sobre el lomo del centro hasta el otro lado. */
