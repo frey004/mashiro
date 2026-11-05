@@ -122,6 +122,19 @@ details[open] summary::after { content: "−"; }
 details p, details ul { color: var(--muted); margin: 0 0 16px; }
 details li { margin-bottom: 6px; }
 
+/* Capturas: viñetas de distinto tamaño, como una página de manga */
+.shots { display: grid; grid-template-columns: .9fr .9fr 1fr; grid-template-rows: auto auto; gap: 14px; }
+.shots figure { margin: 0; position: relative; border: 3px solid var(--ink); background: #fff; overflow: hidden; }
+.shots img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.shots figcaption { position: absolute; left: 8px; bottom: 8px; font: 700 13px/1.2 var(--f-caption); text-transform: uppercase; background: #fff; border: 2px solid var(--ink); border-radius: 8px; padding: 5px 9px; }
+.shots .tall { grid-row: span 2; }
+.shots .wide img { object-position: center; }
+@media (max-width: 760px) {
+  .shots { grid-template-columns: 1fr 1fr; }
+  .shots .tall { grid-row: auto; }
+  .shots .wide { grid-column: span 2; }
+}
+
 /* Cierre: viñeta negra de traje */
 .finale { text-align: center; background: var(--ink) repeating-linear-gradient(90deg, transparent 0 13px, rgba(255,255,255,.07) 13px 14px); color: #fff; }
 .finale h2 { color: var(--lime); font-size: clamp(56px, 10vw, 104px); text-shadow: 4px 4px 0 var(--purple); }
@@ -133,6 +146,7 @@ footer { text-align: center; color: var(--muted); font-size: 14px; padding: 8px 
   <a class="brand" href="#inicio"><img src="img/logo.png" alt=""><b>ましろ</b></a>
   <div class="bar" aria-hidden="true"><i></i></div>
   <nav>
+    <a href="#capturas">Capturas</a>
     <a href="#guia">Guía</a>
     <a href="#problemas">Ayuda</a>
     <a href="#privacidad">Privacidad</a>
@@ -159,6 +173,17 @@ footer { text-align: center; color: var(--muted); font-size: 14px; padding: 8px 
       <img class="spark" src="img/intro_spark.webp" alt="">
     </div>
   </div>
+
+  <section class="panel" id="capturas">
+    <span class="caption">Prólogo<br>Así se ve</span>
+    <h2>Capturas</h2>
+    <div class="shots">
+      <figure class="tall"><img src="img/screens/biblioteca.webp" alt="Biblioteca de ましろ con portadas, porcentaje leído y capítulos sin leer" loading="lazy"><figcaption>Biblioteca</figcaption></figure>
+      <figure class="tall"><img style="object-position: left top" src="img/screens/drive.webp" alt="Ajustes de copias de seguridad en Google Drive" loading="lazy"><figcaption>Copias en Google Drive</figcaption></figure>
+      <figure class="wide"><img src="img/screens/hoja.webp" alt="Página pasándose como una hoja de papel en doble página" loading="lazy"><figcaption>Hoja que se dobla</figcaption></figure>
+      <figure class="wide"><img src="img/screens/libro.webp" alt="Libro en 3D abriéndose entre capítulos" loading="lazy"><figcaption>Libro en 3D</figcaption></figure>
+    </div>
+  </section>
 
   <section class="panel" id="guia">
     <span class="caption">Capítulo 1<br>Primeros pasos</span>
