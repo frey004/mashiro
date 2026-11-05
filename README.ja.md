@@ -43,10 +43,6 @@ APK は変更のたびに GitHub Actions で自動ビルドされ、[Releases](.
 
 本アプリの開発者は利用可能なコンテンツ提供元とは一切関係がなく、本アプリはいかなるコンテンツもホストしていません。
 
-## AIによる開発
-
-このフォークの変更の大部分（コード、翻訳、画像処理、ウェブサイト）は、メンテナーの指示のもと AI アシスタント（Anthropic の Claude）によって作成されました。変更は自動でビルド・確認されていますが、すべてを一行ずつレビューしたり多くの端末でテストしたりしたわけではないため、不具合がある可能性があります。ソフトウェアはライセンスに記載のとおり「現状のまま」無保証で提供されます。問題があれば [Issue を作成](../../issues)してください。
-
 ## ライセンス
 
 ましろはオープンソースプロジェクト Mihon をベースにしており、Apache 2.0 ライセンスで配布されています。[LICENSE](./LICENSE) ファイルをご覧ください。
@@ -65,3 +61,7 @@ APK は変更のたびに GitHub Actions で自動ビルドされ、[Releases](.
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
+
+---
+
+**AIによる開発:** このフォークの変更の大部分（コード、翻訳、画像処理、ウェブサイト）は、メンテナーの指示のもと AI アシスタント（Anthropic の Claude）によって作成されました。変更は自動でビルド・確認されていますが、すべてを一行ずつレビューしたり多くの端末でテストしたりしたわけではないため、不具合がある可能性があります。ソフトウェアはライセンスに記載のとおり「現状のまま」無保証で提供されます。問題があれば [Issue を作成](../../issues)してください。

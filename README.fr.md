@@ -43,10 +43,6 @@ L’APK est compilé automatiquement avec GitHub Actions à chaque modification 
 
 Les développeurs de cette application n’ont aucun lien avec les fournisseurs de contenu disponibles, et l’application n’héberge aucun contenu.
 
-## Fait avec l’IA
-
-La plupart des modifications de ce fork (code, traductions, traitement des images et site web) ont été écrites avec un assistant d’intelligence artificielle (Claude, d’Anthropic) selon les indications du mainteneur. Elles sont compilées et vérifiées automatiquement, mais toutes n’ont pas été relues ligne par ligne ni testées sur de nombreux appareils : des bugs sont possibles. Le logiciel est fourni « tel quel », sans garantie, comme l’indique la licence. En cas de problème, [ouvrez une issue](../../issues).
-
 ## Licence
 
 ましろ est basé sur le projet open source Mihon et distribué sous licence Apache 2.0. Voir le fichier [LICENSE](./LICENSE).
@@ -65,3 +61,7 @@ La plupart des modifications de ce fork (code, traductions, traitement des image
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
+
+---
+
+**Fait avec l’IA:** La plupart des modifications de ce fork (code, traductions, traitement des images et site web) ont été écrites avec un assistant d’intelligence artificielle (Claude, d’Anthropic) selon les indications du mainteneur. Elles sont compilées et vérifiées automatiquement, mais toutes n’ont pas été relues ligne par ligne ni testées sur de nombreux appareils : des bugs sont possibles. Le logiciel est fourni « tel quel », sans garantie, comme l’indique la licence. En cas de problème, [ouvrez une issue](../../issues).
