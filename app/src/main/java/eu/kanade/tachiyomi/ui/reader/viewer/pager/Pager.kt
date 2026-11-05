@@ -4,8 +4,11 @@ import android.content.Context
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.MotionEvent
+import androidx.viewpager.widget.ViewPager.SCROLL_STATE_DRAGGING
+import androidx.viewpager.widget.ViewPager.SimpleOnPageChangeListener
 import androidx.viewpager.widget.DirectionalViewPager
 import eu.kanade.tachiyomi.ui.reader.viewer.GestureDetectorWithLongTap
+import kotlin.math.abs
 
 /**
  * Pager implementation that listens for tap and long tap and allows temporarily disabling touch
@@ -62,11 +65,51 @@ open class Pager(
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         touchObserver?.invoke(ev)
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                swipeDownX = ev.x
+                swipeDownY = ev.y
+                swipeStartItem = currentItem
+                draggedThisGesture = false
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> draggedThisGesture = false
+        }
         val handled = super.dispatchTouchEvent(ev)
+        if (ev.actionMasked == MotionEvent.ACTION_UP) finishShortSwipe(ev)
         if (isGestureDetectorEnabled) {
             gestureDetector.onTouchEvent(ev)
         }
         return handled
+    }
+
+    private var swipeDownX = 0f
+    private var swipeDownY = 0f
+    private var swipeStartItem = 0
+    private var draggedThisGesture = false
+
+    init {
+        addOnPageChangeListener(
+            object : SimpleOnPageChangeListener() {
+                override fun onPageScrollStateChanged(state: Int) {
+                    if (state == SCROLL_STATE_DRAGGING) draggedThisGesture = true
+                }
+            },
+        )
+    }
+
+    /**
+     * Basta un deslizamiento corto para pasar de página: si el pager arrastraba la página pero iba
+     * a volver a la misma, se lleva a la de al lado. Solo cuenta cuando el pager estaba
+     * arrastrando, así que mover una imagen con zoom no cambia de página.
+     */
+    private fun finishShortSwipe(ev: MotionEvent) {
+        if (!draggedThisGesture || currentItem != swipeStartItem || width == 0) return
+        val dx = ev.x - swipeDownX
+        val dy = ev.y - swipeDownY
+        if (abs(dx) < width * SHORT_SWIPE_FRACTION || abs(dx) < abs(dy) * 1.2f) return
+        val target = swipeStartItem + if (dx < 0) 1 else -1
+        val count = adapter?.count ?: return
+        if (target in 0 until count) setCurrentItem(target, true)
     }
 
     /**
@@ -113,3 +156,6 @@ open class Pager(
         isGestureDetectorEnabled = enabled
     }
 }
+
+/** Parte del ancho que hay que deslizar para pasar de página. */
+private const val SHORT_SWIPE_FRACTION = 0.12f

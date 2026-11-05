@@ -177,6 +177,12 @@ abstract class PagerViewer(val activity: ReaderActivity) : Viewer {
         pager.touchObserver = ::onCurlTouch
 
         config.doublePagesChangedListener = {
+            // Las imágenes preparadas para la hoja eran de una sola página (o de dos): se rehacen
+            pageImageJobs.values.forEach { it.cancel() }
+            pageImageJobs.clear()
+            pageImages.clear()
+            lastPageSnapshot = null
+            endCurl()
             lastChapters?.let { chapters ->
                 val page = currentPage as? ReaderPage
                 setChaptersInternal(chapters)
