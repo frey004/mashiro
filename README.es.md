@@ -43,6 +43,10 @@ El APK se compila automáticamente con GitHub Actions en cada cambio y se public
 
 Los desarrolladores de esta aplicación no tienen relación con los proveedores de contenido disponibles, y la aplicación no aloja ningún contenido.
 
+## Hecho con IA
+
+La mayoría de los cambios de esta versión (código, traducciones, tratamiento de imágenes y la página web) se escribieron con un asistente de inteligencia artificial (Claude, de Anthropic) siguiendo las indicaciones del mantenedor. Se compilan y comprueban automáticamente, pero no todos los cambios se han revisado línea por línea ni probado en muchos dispositivos, así que puede haber fallos. El software se ofrece "tal cual", sin garantías, como indica la licencia. Si algo falla, por favor [abre un issue](../../issues).
+
 ## Licencia
 
 ましろ está basada en el proyecto de código abierto Mihon y se distribuye bajo la licencia Apache 2.0. Consulta el archivo [LICENSE](./LICENSE).

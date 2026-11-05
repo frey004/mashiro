@@ -43,6 +43,10 @@ The APK is built automatically with GitHub Actions on every change and published
 
 The developers of this application have no affiliation with the content providers available, and this application hosts no content.
 
+## Made with AI
+
+Most of the changes in this fork (code, translations, artwork processing and the website) were written with an AI assistant (Claude, by Anthropic) under the maintainer's direction. They were built and checked automatically, but not every change has been reviewed line by line or tested on many devices, so expect rough edges. The software is provided "as is", without warranty, as stated in the license. If something breaks, please [open an issue](../../issues).
+
 ## License
 
 ましろ is based on the open source project Mihon and is distributed under the Apache 2.0 license. See the [LICENSE](./LICENSE) file.
